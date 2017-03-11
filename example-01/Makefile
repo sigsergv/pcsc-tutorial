@@ -16,4 +16,4 @@ clean:
 	rm -f *.o example-01
 
 %.o: %.c
-	$(CC) -c -o $@ $< $(CCFLAGS)
+	$(CC) -Wall -c -o $@ $< $(CCFLAGS)
