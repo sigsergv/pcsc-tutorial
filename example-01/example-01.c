@@ -52,7 +52,6 @@ int main(int argc, char **argv)
     printf("Connection to PC/SC established\n");
 
     DWORD readers_size;
-    LPSTR readers;
 
     result = SCardListReaders(sc_context, NULL, 0, &readers_size);
     if (result != SCARD_S_SUCCESS) {
@@ -60,6 +59,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    LPSTR readers;
     readers = calloc(1, readers_size);
 
     result = SCardListReaders(sc_context, NULL, readers, &readers_size);
@@ -67,7 +67,6 @@ int main(int argc, char **argv)
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
     }
-
 
     printf("Found readers:\n");
     int n = 0;

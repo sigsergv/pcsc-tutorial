@@ -1,19 +1,21 @@
-UNAME_S := $(shell uname -s)
+OBJS := example-01.o
+BINARY := example-01
 
+UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
-	CCFLAGS +=
-	LDFLAGS +=
+	CCFLAGS += -I/usr/include/PCSC
+	LDFLAGS += -lpcsclite
 endif
 ifeq ($(UNAME_S),Darwin)
 	CCFLAGS +=
 	LDFLAGS += -framework PCSC
 endif
 
-example-01: example-01.o
+$(BINARY): $(OBJS)
 	$(CC) -o $@ $^ $(CCFLAGS) $(LDFLAGS)
 
 clean:
-	rm -f *.o example-01
+	rm -f $(BINARY) $(OBJS)
 
 %.o: %.c
 	$(CC) -Wall -c -o $@ $< $(CCFLAGS)
