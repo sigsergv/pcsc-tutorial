@@ -39,6 +39,8 @@
 #include <wintypes.h>
 #endif
 
+#include "../util/util.h"
+
 int main(int argc, char **argv)
 {
     LONG result;
@@ -71,15 +73,74 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // print found readers, it's a "double-null-terminated string"
-    printf("Found readers:\n");
-    int n = 0;
-    for (int i = 0; i < readers_size - 1; ++i) {
-        ++n;
-        printf("  Reader #%d: %s\n", n, &readers[i]);
-        while (readers[++i] != 0);
+    // take first reader, 256-bytes buffer should be enough
+    char reader[256] = {0};
+
+    if (readers_size > 1) {
+        strncpy(reader, readers, 255);
+    } else {
+        printf("No readers found!\n");
+        return 2;
     }
-    printf("total: %i\n", n);
+
+    free(readers);
+
+    printf("Use reader '%s'\n", reader);
+
+    // connect to reader and wait for card
+    SCARD_READERSTATE sc_reader_states[1];
+    sc_reader_states[0].szReader = reader;
+    sc_reader_states[0].dwCurrentState = SCARD_STATE_EMPTY;
+
+    result = SCardGetStatusChange(sc_context, INFINITE, sc_reader_states, 1);
+    if (result != SCARD_S_SUCCESS) {
+        printf("%s\n", pcsc_stringify_error(result));
+        return 1;
+    }
+
+    // connect to inserted card
+    SCARDHANDLE card;
+    DWORD active_protocol;
+
+    result = SCardConnect(sc_context, reader, 
+        SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1,
+        &card, &active_protocol);
+    if (result != SCARD_S_SUCCESS) {
+        printf("%s\n", pcsc_stringify_error(result));
+        return 1;
+    }
+
+    if (active_protocol == SCARD_PROTOCOL_T0) {
+        printf("Card connected, protocol to use: T0.\n");
+    }
+    if (active_protocol == SCARD_PROTOCOL_T1) {
+        printf("Card connected, protocol to use: T1.\n");
+    }
+
+    // fetch reader status
+    char reader_friendly_name[MAX_READERNAME];
+    DWORD reader_friendly_name_size = MAX_READERNAME;
+    DWORD state;
+    DWORD protocol;
+    DWORD atr_size = MAX_ATR_SIZE;
+    BYTE atr[MAX_ATR_SIZE];
+
+    result = SCardStatus(card, reader_friendly_name, &reader_friendly_name_size, 
+        &state, &protocol, atr, &atr_size);
+    if (result != SCARD_S_SUCCESS) {
+        printf("%s\n", pcsc_stringify_error(result));
+        return 1;
+    }
+
+    printf("Card ATR: ");
+    print_bytes(atr, atr_size);
+
+    // disconnect from card
+    result = SCardDisconnect(card, SCARD_RESET_CARD);
+    if (result != SCARD_S_SUCCESS) {
+        printf("%s\n", pcsc_stringify_error(result));
+        return 1;
+    }
 
     // relase connection to library
     result = SCardReleaseContext(sc_context);
@@ -88,6 +149,7 @@ int main(int argc, char **argv)
         return 1;
     }
     printf("Connection to PC/SC closed\n");
+
 
     return 0;
 }
