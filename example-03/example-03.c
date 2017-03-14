@@ -122,7 +122,7 @@ int main(int argc, char **argv)
     }
 
     // send APDU to get UID
-    BYTE send_buffer[] = {0xff, 0xca, 0x00, 0x00, 0xa};
+    BYTE send_buffer[] = {0xff, 0xca, 0x00, 0x00, 0x0};
     BYTE recv_buffer[0x20];
     DWORD recv_length = sizeof(recv_buffer);
 
@@ -141,10 +141,9 @@ int main(int argc, char **argv)
 
     BYTE SW1 = recv_buffer[recv_length-2];
     BYTE SW2 = recv_buffer[recv_length-1];
+    int SW12 = SW1*256 + SW2;
 
-    LONG apdu_response_code = SW1*256 + SW2;
-
-    if (apdu_response_code != 0x9000) {
+    if (SW12 != 0x9000) {
         printf("Failed to fetch UID! SW1=%02X, SW2=%02X\n", SW1, SW2);
     } else {
         printf("Success!\n");
