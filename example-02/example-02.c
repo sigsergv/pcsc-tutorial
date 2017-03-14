@@ -59,6 +59,7 @@ int main(int argc, char **argv)
 
     result = SCardListReaders(sc_context, NULL, 0, &readers_size);
     if (result != SCARD_S_SUCCESS) {
+        SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
     }
@@ -69,6 +70,7 @@ int main(int argc, char **argv)
 
     result = SCardListReaders(sc_context, NULL, readers, &readers_size);
     if (result != SCARD_S_SUCCESS) {
+        SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
     }
@@ -94,6 +96,7 @@ int main(int argc, char **argv)
 
     result = SCardGetStatusChange(sc_context, INFINITE, sc_reader_states, 1);
     if (result != SCARD_S_SUCCESS) {
+        SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
     }
@@ -106,6 +109,7 @@ int main(int argc, char **argv)
         SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1,
         &card, &active_protocol);
     if (result != SCARD_S_SUCCESS) {
+        SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
     }
@@ -128,6 +132,8 @@ int main(int argc, char **argv)
     result = SCardStatus(card, reader_friendly_name, &reader_friendly_name_size, 
         &state, &protocol, atr, &atr_size);
     if (result != SCARD_S_SUCCESS) {
+        SCardDisconnect(card, SCARD_RESET_CARD);
+        SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
     }
@@ -138,6 +144,7 @@ int main(int argc, char **argv)
     // disconnect from card
     result = SCardDisconnect(card, SCARD_RESET_CARD);
     if (result != SCARD_S_SUCCESS) {
+        SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
     }

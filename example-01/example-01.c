@@ -57,6 +57,7 @@ int main(int argc, char **argv)
 
     result = SCardListReaders(sc_context, NULL, 0, &readers_size);
     if (result != SCARD_S_SUCCESS) {
+        SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
     }
@@ -67,6 +68,7 @@ int main(int argc, char **argv)
 
     result = SCardListReaders(sc_context, NULL, readers, &readers_size);
     if (result != SCARD_S_SUCCESS) {
+        SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
     }
