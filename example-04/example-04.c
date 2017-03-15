@@ -132,8 +132,10 @@ int main(int argc, char **argv)
     // load authentication key
     send_buffer_size = 11;
     //                  CLA    INS    P1     P2     Lc
+    // memcpy(send_buffer, "\xff" "\x82" "\x00" "\x00" "\x06" "\xa0\xa1\xa2\xa3\xa4\xa5", send_buffer_size);
+    // memcpy(send_buffer, "\xff" "\x82" "\x00" "\x00" "\x06" "\xd3\xf7\xd3\xf7\xd3\xf7", send_buffer_size);
+    // memcpy(send_buffer, "\xff" "\x82" "\x00" "\x00" "\x06" "\x73\x06\x8f\x11\x8c\x13", send_buffer_size);
     memcpy(send_buffer, "\xff" "\x82" "\x00" "\x00" "\x06" "\xff\xff\xff\xff\xff\xff", send_buffer_size);
-    // memcpy(send_buffer, "\xff" "\x82" "\x00" "\x00" "\x06" "\xff\xff\xff\xff\xff\xff", send_buffer_size);
     // \xd3\xf7\xd3\xf7\xd3\xf7
     // \xa0\xa1\xa2\xa3\xa4\xa5
     // \x73\x06\x8f\x11\x8c\x13
@@ -163,6 +165,47 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // authentication
+    recv_length = recv_buffer_size;
+    send_buffer_size = 10;
+    // INS=0x86 Authentication
+    // P1=0x00
+    // P2=0x00
+    // Lc=0x5  Length of command
+    // Command bytes = {
+    //   0x01  Version
+    //   0x00
+    //   0x00  Block number
+    //   0x60  Key type, 0x60 means Key A
+    //   0x00  Key location 0x00
+    // }
+    //                  CLA    INS    P1     P2     Lc     Command bytes
+    memcpy(send_buffer, "\xff" "\x86" "\x00" "\x00" "\x05" "\x01\x00\x00\x60\x00", send_buffer_size);
+
+    result = SCardTransmit(card, SCARD_PCI_T1, 
+        send_buffer, send_buffer_size, NULL,
+        recv_buffer, &recv_length);
+    if (result != SCARD_S_SUCCESS) {
+        SCardDisconnect(card, SCARD_RESET_CARD);
+        SCardReleaseContext(sc_context);
+        printf("%s\n", pcsc_stringify_error(result));
+        return 1;
+    }
+
+    SW1 = recv_buffer[recv_length-2];
+    SW2 = recv_buffer[recv_length-1];
+    SW = SW1 * 256 + SW2;
+
+    if (SW != 0x9000) {
+        printf("Failed to auth\n");
+        printf("Response APDU: ");
+        print_bytes(recv_buffer, recv_length);
+        SCardDisconnect(card, SCARD_RESET_CARD);
+        SCardReleaseContext(sc_context);
+        return 1;
+    }
+
+
     // read block
     recv_length = recv_buffer_size;
     send_buffer_size = 5;
@@ -191,6 +234,9 @@ int main(int argc, char **argv)
         SCardReleaseContext(sc_context);
         return 1;
     }
+
+    printf("Block: ");
+    print_bytes(recv_buffer, recv_length);
 
 
     // printf("Response APDU: ");
