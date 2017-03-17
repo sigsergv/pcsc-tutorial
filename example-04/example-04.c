@@ -139,11 +139,9 @@ int main(int argc, char **argv)
     // Command bytes = { key bytes }
 
     //                  CLA    INS    P1     P2     Lc
-    // memcpy(send_buffer, "\xff" "\x82" "\x00" "\x00" "\x06" "\x00\x00\x00\x00\x00\x00", send_buffer_size);
-    // memcpy(send_buffer, "\xff" "\x82" "\x00" "\x00" "\x06" "\xff\xff\xff\xff\xff\xff", send_buffer_size);
-    memcpy(send_buffer, "\xff" "\x82" "\x00" "\x00" "\x06" "\xa0\xa1\xa2\xa3\xa4\xa5", send_buffer_size);
-    // memcpy(send_buffer, "\xff" "\x82" "\x00" "\x00" "\x06" "\xd3\xf7\xd3\xf7\xd3\xf7", send_buffer_size);
-    // memcpy(send_buffer, "\xff" "\x82" "\x00" "\x00" "\x06" "\x73\x06\x8f\x11\x8c\x13", send_buffer_size);
+    memcpy(send_buffer, "\xff" "\x82" "\x00" "\x00" "\x06" "\xff\xff\xff\xff\xff\xff", send_buffer_size);
+
+    // other possible keys
     // \xd3\xf7\xd3\xf7\xd3\xf7
     // \xa0\xa1\xa2\xa3\xa4\xa5
     // \x73\x06\x8f\x11\x8c\x13
@@ -224,7 +222,7 @@ int main(int argc, char **argv)
     // P2 =  Block number LSB, read block number 0x0003
     // Le =  Expected response length 0x10 = 16 bytes
     //                  CLA    INS    P1     P2     Le
-    memcpy(send_buffer, "\xff" "\xb0" "\x00" "\x03" "\x10", send_buffer_size);
+    memcpy(send_buffer, "\xff" "\xb0" "\x00" "\x00" "\x10", send_buffer_size);
 
     result = SCardTransmit(card, SCARD_PCI_T1, 
         send_buffer, send_buffer_size, NULL,
