@@ -52,11 +52,7 @@ int main(int argc, char **argv)
 
         bytes_list b = context.atr();
 
-        std::cout << "ATR: " << b.format() << std::endl;
-        // for (std::list<std::string>::const_iterator i = readers.begin(); i != readers.end(); i++) {
-        //     std::cout << (*i) << std::endl;
-        // }
-        // std::cout << "Readers: " << context->readers() << std::endl;
+        std::cout << "RAW ATR: " << b.format() << std::endl;
     } catch (const std::runtime_error& e) {
         std::cerr << "Runtime error: " << e.what() << std::endl;
     }

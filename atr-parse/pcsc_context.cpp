@@ -49,8 +49,8 @@
 
 struct PCSCContext::Private
 {
-    SCARDCONTEXT context = 0;
-    SCARDHANDLE card = 0;
+    SCARDCONTEXT context;
+    SCARDHANDLE card;
 
     void release_context() {
         if (context == 0) {
@@ -67,6 +67,11 @@ struct PCSCContext::Private
         SCardDisconnect(card, SCARD_RESET_CARD);
         card = 0;
     };
+
+    Private() {
+        card = 0;
+        context = 0;
+    }
 };
 
 #define CONTEXT_READY_CHECK if (p->context == 0) { throw std::runtime_error("Context not ready!"); }
@@ -84,7 +89,7 @@ PCSCContext::PCSCContext()
     if (result != SCARD_S_SUCCESS) {
         make_runtime_error(result, "SCardEstablishContext()");
     }
-    std::cerr << "=> Created" << std::endl;
+    std::cerr << "=> Created context object" << std::endl;
 }
 
 std::list<std::string> PCSCContext::readers()
@@ -105,7 +110,7 @@ std::list<std::string> PCSCContext::readers()
 
     result = SCardListReaders(p->context, NULL, readers_buffer, &readers_buffer_size);
     if (result != SCARD_S_SUCCESS) {
-        delete readers_buffer;
+        delete[] readers_buffer;
         p->release_context();
         make_runtime_error(result, "SCardListReaders()");
     }
@@ -127,7 +132,7 @@ PCSCContext::~PCSCContext()
     p->release_context();
 
     delete p;
-    std::cerr << "=> Destroyed" << std::endl;
+    std::cerr << "=> Destroyed context object" << std::endl;
 }
 
 void PCSCContext::wait_for_card(std::string reader)

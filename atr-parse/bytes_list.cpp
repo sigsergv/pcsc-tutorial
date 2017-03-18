@@ -39,20 +39,25 @@
 
 struct bytes_list::Private
 {
-    unsigned int size = 0;
-    unsigned char * data = 0;
+    unsigned int size;
+    unsigned char * data;
+
+    Private() {
+        size = 0;
+        data = 0;
+    };
 };
 
 bytes_list::bytes_list()
 {
-    std::cerr << "created bytes_list instance" << std::endl;
     p = new Private;
+    std::cerr << "=> Created empty bytes_list instance" << std::endl;
 }
 
 bytes_list::bytes_list(const unsigned char * src, size_t size)
 {
     p = new Private;
-    std::cerr << "created bytes_list instance from bytes" << std::endl;
+    std::cerr << "=> Created bytes_list instance from bytes" << std::endl;
     if (size == 0) {
         return;
     }
@@ -64,7 +69,7 @@ bytes_list::bytes_list(const unsigned char * src, size_t size)
 
 bytes_list::~bytes_list()
 {
-    std::cerr << "destroyed bytes_list instance" << std::endl;
+    std::cerr << "=> Destroyed bytes_list instance" << std::endl;
     delete[] p->data;
     delete p;
 }
