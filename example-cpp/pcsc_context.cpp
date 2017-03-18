@@ -26,9 +26,8 @@
  */
 
 /**
- * \file pcsc_context.cpp
- * \author Sergey Stolyarov <sergei@regolit.com>
- * \brief PC/SC Context wrapper object
+ * @file pcsc_context.cpp
+ * @author Sergey Stolyarov <sergei@regolit.com>
  */
 
 #include <stdexcept>
@@ -45,6 +44,7 @@
 #include <wintypes.h>
 #endif
 
+#include "debug.h"
 #include "pcsc_context.h"
 
 struct PCSCContext::Private
@@ -89,7 +89,7 @@ PCSCContext::PCSCContext()
     if (result != SCARD_S_SUCCESS) {
         make_runtime_error(result, "SCardEstablishContext()");
     }
-    std::cerr << "=> Created context object" << std::endl;
+    PRINT_DEBUG("=> Created context object ");
 }
 
 std::list<std::string> PCSCContext::readers()
@@ -132,7 +132,7 @@ PCSCContext::~PCSCContext()
     p->release_context();
 
     delete p;
-    std::cerr << "=> Destroyed context object" << std::endl;
+    PRINT_DEBUG("=> Destroyed context object");
 }
 
 void PCSCContext::wait_for_card(std::string reader)

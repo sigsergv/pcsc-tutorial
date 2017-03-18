@@ -26,16 +26,22 @@
  */
 
 /**
- * \file pcsc_context.cpp
- * \author Sergey Stolyarov <sergei@regolit.com>
- * \brief bytes list class
+ * @file pcsc_context.cpp
+ * @author Sergey Stolyarov <sergei@regolit.com>
+ * @brief Класс для работы со списком байтов.
  */
 
+#include <stdexcept>
 #include <iostream>
+#include <sstream>
 #include <string.h>
 #include <stdio.h>
 
 #include "bytes_list.h"
+#include "debug.h"
+
+std::string byte_format_str(bytes_list::format_t f);
+std::string byte_sep_str(bytes_list::format_t f);
 
 struct bytes_list::Private
 {
@@ -46,18 +52,24 @@ struct bytes_list::Private
         size = 0;
         data = 0;
     };
+
+    ~Private() {
+        if (data != 0) {
+            delete[] data;
+        }
+    }
 };
 
 bytes_list::bytes_list()
 {
     p = new Private;
-    std::cerr << "=> Created empty bytes_list instance" << std::endl;
+    PRINT_DEBUG("=> Created empty bytes_list instance");
 }
 
 bytes_list::bytes_list(const unsigned char * src, size_t size)
 {
     p = new Private;
-    std::cerr << "=> Created bytes_list instance from bytes" << std::endl;
+    PRINT_DEBUG("=> Created bytes_list instance from bytes");
     if (size == 0) {
         return;
     }
@@ -67,22 +79,136 @@ bytes_list::bytes_list(const unsigned char * src, size_t size)
     memcpy(p->data, src, size);
 }
 
+bytes_list::bytes_list(const bytes_list & src)
+{
+    p = new Private;
+    p->size = (src.p)->size;
+
+    if ((src.p)->size > 0) {
+        p->data = new unsigned char[(src.p)->size];
+        memcpy(p->data, (src.p)->data, (src.p)->size);
+    }
+    PRINT_DEBUG("=> Created bytes_list by copy.");
+}
+
 bytes_list::~bytes_list()
 {
-    std::cerr << "=> Destroyed bytes_list instance" << std::endl;
-    delete[] p->data;
+    PRINT_DEBUG("=> Destroyed bytes_list instance");
     delete p;
 }
 
-std::string bytes_list::format()
+std::string bytes_list::str(bytes_list::format_t f) const
 {
-    char cbuf[6];
-    std::string s;
+    char cbuf[32];
+    std::string format_str = byte_format_str(f);
+    std::string sep = byte_sep_str(f);
+    std::stringstream ss;
+
+    const char * fmt = format_str.c_str();
 
     for (size_t i=0; i < (p->size); i++) {
-        snprintf(cbuf, 5, "%02X", (p->data)[i]);
-        s.append(cbuf);
-        s.append(" ");
+        snprintf(cbuf, 31, fmt, (p->data)[i]);
+        ss << cbuf;
+        if (i+1 != p->size) {
+            ss << sep;
+        }
     }
+    return ss.str();
+}
+
+size_t bytes_list::size() const
+{
+    return p->size;
+}
+
+void bytes_list::replace(const bytes_list & src)
+{
+    if (p->size > 0) {
+        delete[] p->data;
+        p->size = 0;
+    }
+
+    p->size = (src.p)->size;
+
+    if ((src.p)->size > 0) {
+        p->data = new unsigned char[(src.p)->size];
+        memcpy(p->data, (src.p)->data, (src.p)->size);
+    }
+}
+
+unsigned char bytes_list::at(size_t index) const
+{
+    if (index >= p->size) {
+        throw std::out_of_range("at(): out of range");
+    }
+
+    return p->data[index];
+}
+
+std::string bytes_list::byte_str(unsigned char byte, bytes_list::format_t f)
+{
+    char cbuf[32];
+    std::string format_str = byte_format_str(f);
+
+    const char * fmt = format_str.c_str();
+
+    snprintf(cbuf, 31, fmt, byte);
+
+    return cbuf;
+}
+
+std::string bytes_list::at_str(size_t index, bytes_list::format_t f) const
+{
+    return byte_str(at(index));
+}
+
+bytes_list bytes_list::slice(size_t pos, size_t length) const
+{
+    if (pos >= p->size && (pos+length) > p->size) {
+        throw std::out_of_range("out of range");
+    }
+
+    return bytes_list(p->data + pos, length);
+}
+
+std::string byte_format_str(bytes_list::format_t f)
+{
+    std::string s;
+
+    switch (f) {
+    case bytes_list::format_c:
+        s = "0x%02x";
+        break;
+
+    case bytes_list::format_o:
+        s = "%02X";
+        break;
+
+    case bytes_list::format_s:
+        s = "\\x%02X";
+        break;
+    }
+
+    return s;
+}
+
+std::string byte_sep_str(bytes_list::format_t f)
+{
+    std::string s;
+
+    switch (f) {
+    case bytes_list::format_c:
+        s = ", ";
+        break;
+
+    case bytes_list::format_o:
+        s = " ";
+        break;
+
+    case bytes_list::format_s:
+        s = "";
+        break;
+    }
+
     return s;
 }

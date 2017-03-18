@@ -26,35 +26,40 @@
  */
 
 /**
- * @file pcsc_context.h
+ * @file scan-atr.cpp
  * @author Sergey Stolyarov <sergei@regolit.com>
+ * @brief Сканирует карту и печатает ATR
  */
 
-#ifndef _H_d2a9c661dfd54d7ed87450dfa1e0a5fc
-#define _H_d2a9c661dfd54d7ed87450dfa1e0a5fc
+#include <stdexcept>
+#include <iostream>
 
-#include <string>
-#include <list>
+#include "pcsc_context.h"
+#include "atr_parser.h"
 
-#include "bytes_list.h"
+int main(int argc, char **argv)
+{
+    try {
+        PCSCContext context;
 
-/**
- * @brief Класс, через который происходит работа с библиотекой PC/SC 
- */
-class PCSCContext {
-public:
-    PCSCContext();
-    ~PCSCContext();
+        std::list<std::string> readers = context.readers();
 
-    void wait_for_card(std::string reader);
+        if (readers.size() == 0) {
+            std::cout << "No readers, exit." << std::endl;
+        } else {
+            std::string reader = readers.front();
+            context.wait_for_card(reader);
+        }
 
-    std::list<std::string> readers();
+        bytes_list atr = context.atr();
 
-    bytes_list atr();
+        ATRParser parser;
 
-private:
-    struct Private;
-    Private * p;
-};
+        parser.load(atr);
+        std::cout << "Raw ATR: " << atr.str(bytes_list::format_c) << std::endl;
+    } catch (const std::runtime_error& e) {
+        std::cerr << "Runtime error: " << e.what() << std::endl;
+    }
 
-#endif
+    return 0;
+}

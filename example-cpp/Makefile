@@ -1,6 +1,6 @@
 
-BINARY := atr-parse
-OBJS := atr-parse.o pcsc_context.o bytes_list.o
+BINARIES := scan_atr scan_atr_file test_atr_parser
+COMMON_OBJS := pcsc_context.o bytes_list.o atr_parser.o
 
 CPPFLAGS := 
 LDFLAGS := 
@@ -15,13 +15,23 @@ ifeq ($(UNAME_S),Darwin)
 	LDFLAGS += -framework PCSC
 endif
 
-all: $(BINARY)
+ifneq ($(DEBUG),)
+	CPPFLAGS += -DDEBUG
+endif
+
+all: $(BINARIES)
 	
-$(BINARY): $(OBJS)
-	g++ -g -o $@ $(OBJS) $(LDFLAGS)
+scan_atr: scan_atr.o $(COMMON_OBJS)
+	g++ -g -o $@ $^ $(LDFLAGS)
+
+scan_atr_file: scan_atr_file.o $(COMMON_OBJS)
+	g++ -g -o $@ $^ $(LDFLAGS)
+
+test_atr_parser: test_atr_parser.o $(COMMON_OBJS)
+	g++ -g -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm -f $(BINARY) $(OBJS)
+	rm -f $(BINARIES) *.o
 
-%.o: %.cpp
+%.o: %.cpp %.h
 	g++ -Wall -c -o $@ $< $(CPPFLAGS)

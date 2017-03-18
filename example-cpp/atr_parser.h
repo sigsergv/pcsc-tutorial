@@ -26,31 +26,29 @@
  */
 
 /**
- * @file pcsc_context.h
+ * @file atr_parser.h
  * @author Sergey Stolyarov <sergei@regolit.com>
+ *
+ * ATR parser, see ISO/IEC 7816-3
  */
 
-#ifndef _H_d2a9c661dfd54d7ed87450dfa1e0a5fc
-#define _H_d2a9c661dfd54d7ed87450dfa1e0a5fc
+#ifndef _H_7d22064384748b9024e9e7f78f9087f5
+#define _H_7d22064384748b9024e9e7f78f9087f5
 
 #include <string>
-#include <list>
 
-#include "bytes_list.h"
+class bytes_list;
 
-/**
- * @brief Класс, через который происходит работа с библиотекой PC/SC 
- */
-class PCSCContext {
+class ATRParser
+{
 public:
-    PCSCContext();
-    ~PCSCContext();
+    ATRParser();
+    ATRParser(const bytes_list & bytes);
+    ~ATRParser();
 
-    void wait_for_card(std::string reader);
+    std::string str() const;
 
-    std::list<std::string> readers();
-
-    bytes_list atr();
+    void load(const bytes_list & bytes);
 
 private:
     struct Private;

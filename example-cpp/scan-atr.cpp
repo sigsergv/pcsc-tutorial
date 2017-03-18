@@ -26,15 +26,16 @@
  */
 
 /**
- * \file atr-parse.cpp
- * \author Sergey Stolyarov <sergei@regolit.com>
- * \brief scan NFC tag and print parsed ATR
+ * @file scan-atr.cpp
+ * @author Sergey Stolyarov <sergei@regolit.com>
+ * @brief Сканирует карту и печатает ATR
  */
 
 #include <stdexcept>
 #include <iostream>
 
 #include "pcsc_context.h"
+#include "atr_parser.h"
 
 int main(int argc, char **argv)
 {
@@ -50,9 +51,12 @@ int main(int argc, char **argv)
             context.wait_for_card(reader);
         }
 
-        bytes_list b = context.atr();
+        bytes_list atr = context.atr();
 
-        std::cout << "RAW ATR: " << b.format() << std::endl;
+        ATRParser parser;
+
+        parser.load(atr);
+        std::cout << "Raw ATR: " << atr.str(bytes_list::format_c) << std::endl;
     } catch (const std::runtime_error& e) {
         std::cerr << "Runtime error: " << e.what() << std::endl;
     }

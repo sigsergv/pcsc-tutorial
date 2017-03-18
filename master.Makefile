@@ -23,7 +23,7 @@ libutil:
 clean:
 	rm -f $(BINARY) $(OBJS)
 
-%.o: %.c
+%.o: %.c %.h
 	$(CC) -Wall -c -o $@ $< $(CCFLAGS)
 
 .PHONY: libutil
