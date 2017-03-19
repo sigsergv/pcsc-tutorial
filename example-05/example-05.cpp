@@ -60,10 +60,28 @@ int main(int argc, char **argv)
     xpcsc::Bytes atr = c.atr();
     std::cout << "ATR: " << xpcsc::format(atr) << std::endl;
 
-    // parse and print ATR
+    // parse ATR
     xpcsc::ATRParser p;
     p.load(atr);
-    std::cout << p.str() << std::endl;
+
+    if (!p.checkFeature(xpcsc::ATR_FEATURE_PICC) || !p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K)) {
+        std::cerr << "Not Mifare Classic 1K!" << std::endl;
+        return 1;
+    }
+    // std::cout << p.str() << std::endl;
+    // const unsigned char cmd_1_buf[] = {
+    //     xpcsc::CLA_PICC,
+    //     xpcsc::INS_MIFARE_LOAD_KEYS,
+    //     0x00, // P1
+    //     0x00, // P2
+    //     0x06, // Lc
+    //     0xff,0xff,0xff,0xff,0xff,0xff
+    // };
+    // xpcsc::Bytes cmd_1(cmd_1_buf, sizeof(cmd_1_buf));
+    // xpcsc::Bytes response;
+
+    // c.transmit(cmd_1, &response);
+    // std::cout << "Response: " << xpcsc::format(response) << std::endl;
 
     return 0;
 }
