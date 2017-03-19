@@ -60,4 +60,8 @@ ConnectionError::ConnectionError(const char * what)
 {
 }
 
+ATRParseError::ATRParseError(const char * what)
+    : std::runtime_error(what)
+{}
+
 }

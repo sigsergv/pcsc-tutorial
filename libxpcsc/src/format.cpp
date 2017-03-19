@@ -40,13 +40,17 @@ std::string format(Bytes b, FormatOptions fo)
     const char * fmt = format_strings[fo];
     const std::string sep = std::string(sep_strings[fo]);
 
-    Bytes::const_iterator i;
+    Bytes::const_iterator i = b.begin();
     Bytes::const_iterator end = b.end();
     std::stringstream ss;
 
-    for (i = b.begin(); i != end; i++) {
+    while (1) {
+        if (i == end) {
+            break;
+        }
         snprintf(cbuf, 31, fmt, *i);
         ss << cbuf;
+        i++;
         if (i != end) {
             ss << sep;
         }

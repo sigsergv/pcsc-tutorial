@@ -25,6 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _H_7a75aca51ebac9ef34833761fe6b11e0
+#define _H_7a75aca51ebac9ef34833761fe6b11e0
+
 #include <stdexcept>
 #include <vector>
 #include <string>
@@ -33,6 +36,24 @@ namespace xpcsc {
 
 typedef std::basic_string<unsigned char> Bytes;
 typedef std::vector<std::string> Strings;
+
+// some useful constants
+// CLA
+const unsigned char CLA_PICC = 0xff;
+
+// INS
+const unsigned char INS_MIFARE_LOAD_KEYS = 0x82;
+
+// ATR features constants
+typedef enum { 
+    // smart card with contacts
+    ATR_FEATURE_ICC,
+    // proximity card
+    ATR_FEATURE_PICC,
+    // Mifare cards
+    ATR_FEATURE_MIFARE_1K,
+    ATR_FEATURE_MIFARE_4K
+} ATRFeature;
 
 /*
  * Incapsulates pcsc-lite error
@@ -69,6 +90,8 @@ public:
 
     Bytes atr();
 
+    void transmit(const Bytes & command, Bytes * response = 0);
+
 private:
     struct Private;
     Private * p;
@@ -95,6 +118,8 @@ public:
 
     void load(const Bytes & bytes);
 
+    bool checkFeature(ATRFeature);
+
 private:
     struct Private;
     Private * p;
@@ -112,3 +137,5 @@ std::string format(Bytes, FormatOptions fo = FormatHex);
 std::string format(unsigned char, FormatOptions fo = FormatHex);
 
 }
+
+#endif

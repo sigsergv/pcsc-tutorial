@@ -34,6 +34,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <map>
+#include <set>
 
 
 #include "../include/xpcsc.hpp"
@@ -49,11 +50,6 @@ namespace xpcsc {
 
 // check bit: 1,2,...
 #define CHECK_BIT(value, b) (((value) >> (b-1))&1)
-
-
-ATRParseError::ATRParseError(const char * what)
-    : std::runtime_error(what)
-{}
 
 typedef enum {ATRNONE, TS, T0, TA1, TB1, TC1, TD1, 
     TA2, TB2, TC2, TD2, 
@@ -74,8 +70,15 @@ struct ATRParser::Private
     // historical bytes
     unsigned char hb[15];
     size_t hb_size;
+    std::set<ATRFeature> features;
 };
 
+static void initRIDMap();
+static std::string decodeRID(const Bytes &);
+static std::string decodeCardName(const Bytes &, const Bytes &);
+
+// std::map<std::string, std::string> ATRParser::Private::RID_map;
+// std::map<std::string, std::string> ATRParser::Private::PCSC_cardnames_map;
 
 ATRParser::ATRParser()
 {
@@ -85,13 +88,18 @@ ATRParser::ATRParser()
 ATRParser::ATRParser(const Bytes & bytes)
 {
     p = new Private;
-
     load(bytes);
 }
 
+ATRParser::~ATRParser()
+{
+    delete p;
+}
 
 void ATRParser::load(const Bytes & bytes)
 {
+    initRIDMap();
+
     size_t size = bytes.size();
 
     if (size > 33) {
@@ -206,13 +214,12 @@ void ATRParser::load(const Bytes & bytes)
     mn = HN(b);
 }
 
-ATRParser::~ATRParser()
-{
-    delete p;
-}
-
 std::string ATRParser::str() const
 {
+    if (p->atr.size() == 0) {
+        throw ATRParseError("No ATR");
+    }
+
     std::stringstream ss;
     std::stringstream sd;
     std::map<ATRField, unsigned char>::const_iterator end = p->fields.end();
@@ -225,7 +232,7 @@ std::string ATRParser::str() const
     if (p->fields[TS] == 0x3b && HN(p->fields[T0]) == 0x8 
         && p->fields[TD1] == 0x80 && p->fields[TD2] == 0x01)
     {
-        ss << "  Proxymity card detected.";
+        ss << "  Proximity card detected.";
         ss << '\n';
         is_picc = true;
     }
@@ -331,14 +338,24 @@ std::string ATRParser::str() const
             if (hb.at(0) == 0x80) {
                 if (p->hb_size >= 2 && hb.at(1) == 0x4f) {
                     ss << "  PICC application detected" << '\n';
-                    // int hbaid_length = hb.at(2);
                     // next 5 bytes defines  RID
                     Bytes RID = hb.substr(3, 5);
-                    ss << "    RID=" << format(RID) << '\n';
+                    ss << "    RID=" << decodeRID(RID) << '\n';
+
                     unsigned char SS = hb.at(8);
-                    ss << "    SS=" << format(SS) << '\n';
+                    switch (SS) {
+                    case 03:
+                        ss << "    SS=ISO/IEC 14443A, Part 3" << '\n';
+                        break;
+                    case 04:
+                        ss << "    SS=ISO/IEC 14443A, Part 4" << '\n';
+                        break;
+                    default:
+                        ss << "    SS=" << format(SS) << '\n';
+                    }
+
                     Bytes CardName = hb.substr(9, 2);
-                    ss << "    CardName=" << format(CardName) << '\n';
+                        ss << "    CardName=" << decodeCardName(RID, CardName) << '\n';
                 } else {
                     ss << "  TLV data" << '\n';
                     size_t i = 1;
@@ -410,6 +427,104 @@ std::string ATRParser::str() const
 
     return ss.str();
     // return sd.str() + ss.str();
+}
+
+bool ATRParser::checkFeature(ATRFeature feature)
+{
+    if (p->atr.size() == 0) {
+        throw ATRParseError("No ATR");
+    }
+
+    if (p->features.size() == 0) {
+        // fill array with features
+        if (p->fields[TS] == 0x3b && HN(p->fields[T0]) == 0x8 
+            && p->fields[TD1] == 0x80 && p->fields[TD2] == 0x01)
+        {
+            p->features.insert(ATR_FEATURE_PICC);
+
+            // check for mifare
+            Bytes hb(p->hb, p->hb_size);
+            if (p->hb_size >= 2 && hb.at(0) == 0x80 && hb.at(1) == 0x4f) {
+                Bytes RID = hb.substr(3, 5);
+                if (format(RID).compare("A0 00 00 03 06") == 0) {
+                    unsigned int card_name = hb.at(9)*256 + hb.at(10);
+                    switch (card_name) {
+                    case 0x0001:
+                        p->features.insert(ATR_FEATURE_MIFARE_1K);
+                        break;
+                    case 0x0002:
+                        p->features.insert(ATR_FEATURE_MIFARE_4K);
+                        break;
+                    case 0x0003:
+                    case 0x0026:
+                        break;
+                    }
+                }
+            }
+        } else {
+            p->features.insert(ATR_FEATURE_ICC);
+        }
+    }
+
+
+    return p->features.find(feature) != p->features.end();
+}
+
+
+static std::map<std::string, std::string> RID_map;
+static std::map<int, std::string> PCSC_cardnames_map;
+
+static const size_t RID_map_size = 1;
+static const char * RID_map_keys[RID_map_size] = {"A0 00 00 03 06"};
+static const char * RID_map_values[RID_map_size] = {"PC/SC Workgroup"};
+
+static const size_t PCSC_cardnames_map_size = 7;
+static int PCSC_cardnames_map_keys[PCSC_cardnames_map_size] = {0x0001, 0x0002, 0x0003, 0x0026, 0xf004, 0xf011, 0xf012};
+static const char * PCSC_cardnames_map_values[PCSC_cardnames_map_size] = {"MIFARE Classic 1K", "MIFARE Classic 4K", 
+    "MIFARE Ultralight", "MIFARE Mini", "Topaz and Jewel", "FeliCa 212K", "FeliCa 242K"};
+
+
+static void initRIDMap()
+{
+    if (RID_map.size() == 0) {
+        for (size_t i=0; i<RID_map_size; i++) {
+            RID_map[RID_map_keys[i]] = RID_map_values[i];
+        }
+    }
+
+    if (PCSC_cardnames_map.size() == 0) {
+        for (size_t i=0; i<PCSC_cardnames_map_size; i++) {
+            PCSC_cardnames_map[PCSC_cardnames_map_keys[i]] = PCSC_cardnames_map_values[i];
+        }
+    }
+}
+
+static std::string decodeRID(const Bytes & rid)
+{
+    std::stringstream ss;
+    std::string hexRID = format(rid);
+
+    if (RID_map.find(hexRID) != RID_map.end()) {
+        ss << RID_map[hexRID] << " / ";
+    }
+
+    ss << hexRID;
+
+    return ss.str();
+}
+
+static std::string decodeCardName(const Bytes & rid, const Bytes & card_name)
+{
+    std::stringstream ss;
+    int card = card_name.at(1)*255 + card_name.at(0);
+
+    if (format(rid).compare("A0 00 00 03 06") == 0) {
+        if (PCSC_cardnames_map.find(card) != PCSC_cardnames_map.end()) {
+            ss << PCSC_cardnames_map[card] << " / ";
+        }
+    }
+    ss << card;
+    return ss.str();
 }
 
 }

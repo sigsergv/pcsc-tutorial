@@ -219,7 +219,7 @@ std::string ATRParser::str() const
     if (p->fields[TS] == 0x3b && HN(p->fields[T0]) == 0x8 
         && p->fields[TD1] == 0x80 && p->fields[TD2] == 0x01)
     {
-        ss << "  Proxymity card detected.";
+        ss << "  Proximity card detected.";
         ss << '\n';
         is_picc = true;
     }

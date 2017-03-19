@@ -146,6 +146,35 @@ Bytes Connection::atr()
     return b;
 }
 
+void Connection::transmit(const Bytes & command, Bytes * response)
+{
+    CARD_READY_CHECK();
+
+    const LONG recv_buffer_size = 1024;
+    LONG send_buffer_size = command.length();
+    DWORD recv_length = recv_buffer_size;
+
+    PRINT_DEBUG("[D] Command length: " << send_buffer_size);
+
+    unsigned char *recv_buffer = new unsigned char[recv_buffer_size];
+
+    // TODO: select protocol correctly
+    try {
+        PCSC_CALL( SCardTransmit(p->card, SCARD_PCI_T1, 
+            command.data(), send_buffer_size, NULL,
+            recv_buffer, &recv_length) );
+    } catch (PCSCError &e) {
+        delete[] recv_buffer;
+        throw e;
+    }
+
+    delete[] recv_buffer;
+
+    if (response != 0) {
+        response->assign(recv_buffer, recv_length);
+    }
+}
+
 /*
  * You should not call this function, it's for PCSC_CALL() macro.
  */
