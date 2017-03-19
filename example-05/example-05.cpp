@@ -68,6 +68,79 @@ int main(int argc, char **argv)
         std::cerr << "Not Mifare Classic 1K!" << std::endl;
         return 1;
     }
+
+    unsigned char cmd_load_keys[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
+        0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+    unsigned char cmd_general_auth[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
+        0x05, 0x01, 0x00, 0x00, 0x60, 0x00};
+
+    unsigned char cmd_read_binary[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
+
+    const size_t keys_number = 3;
+    unsigned char keys[keys_number][6] = {
+        {0xff,0xff,0xff,0xff,0xff,0xff},
+        {0xa0,0xa1,0xa2,0xa3,0xa4,0xa5},
+        {0xd3,0xf7,0xd3,0xf7,0xd3,0xf7}
+    };
+
+    xpcsc::Bytes command;
+    xpcsc::Bytes response;
+
+    // we have 16 sectors and 64 blocks ahead
+    size_t block = -1;
+    for (size_t i=0; i<0x10; i++) {
+        std::cout << "---------------------------" << std::endl;
+        std::cout << "Sector: " << i << std::endl;
+        // 3 regular blocks
+        for (size_t j=0; j<3; j++) {
+            block++;
+            size_t k;
+            bool key_found = false;
+            std::cout << " block: " << block << std::endl;
+
+            for (k=0; k<keys_number; k++) {
+                std::cout << "  trying key " << k << " ";
+
+                memcpy(cmd_load_keys+5, keys[k], 6);
+                command.assign(cmd_load_keys, 11);
+                c.transmit(command, &response);
+                if (c.response_status(response) != 0x9000) {
+                    std::cout << " .. failed" << std::endl;
+                    continue;
+                }
+
+                // ok, now try auth
+                cmd_general_auth[7] = block;
+                command.assign(cmd_general_auth, 10);
+                c.transmit(command, &response);
+                if (c.response_status(response) != 0x9000) {
+                    std::cout << " .. failed" << std::endl;
+                    continue;
+                }
+
+                std::cout << " .. success!" << std::endl;
+                key_found = true;
+                break;
+            }
+
+            if (key_found) {
+                // we can try to read block using key
+                cmd_read_binary[3] = block;
+                command.assign(cmd_read_binary, 5);
+                c.transmit(command, &response);
+                if (c.response_status(response) != 0x9000) {
+                    std::cout << "  failed to read block data" << std::endl;
+                } else {
+                    std::cout << "  " << xpcsc::format(response.substr(0, response.size()-2)) << std::endl;
+                }
+            }
+        }
+
+        // and one special with keys and access bits
+        block++;
+    }
+
     // std::cout << p.str() << std::endl;
     // const unsigned char cmd_1_buf[] = {
     //     xpcsc::CLA_PICC,
