@@ -219,10 +219,10 @@ int main(int argc, char **argv)
     // CLA = 0xff
     // INS = 0xb0 "Read Binary Command"
     // P1 =  Block number MSB
-    // P2 =  Block number LSB, read block number 0x0003
+    // P2 =  Block number LSB, read block 0x0001
     // Le =  Expected response length 0x10 = 16 bytes
     //                  CLA    INS    P1     P2     Le
-    memcpy(send_buffer, "\xff" "\xb0" "\x00" "\x00" "\x10", send_buffer_size);
+    memcpy(send_buffer, "\xff" "\xb0" "\x00" "\x01" "\x10", send_buffer_size);
 
     result = SCardTransmit(card, SCARD_PCI_T1, 
         send_buffer, send_buffer_size, NULL,
@@ -249,39 +249,6 @@ int main(int argc, char **argv)
 
     printf("Block bytes: ");
     print_bytes(recv_buffer, recv_length-2);
-
-
-    // printf("Response APDU: ");
-    // print_bytes(recv_buffer, recv_length);
-
-
-    // if (SW12 != 0x9000) {
-    //     printf("Failed to fetch UID! SW1=%02X, SW2=%02X\n", SW1, SW2);
-    // } else {
-    //     printf("Success!\n");
-    //     printf("Card UID: ");
-    //     print_bytes(recv_buffer, recv_length - 2);
-    // }
-
-
-
-    // mf
-    // BYTE send_buffer_01[] = {0x00, 0x84, 0x00, 0x00, 0x08};
-    // BYTE send_buffer_01[] = {0x00, 0xA4, 0x04, 0x00, 0x00};
-    // recv_length = recv_buffer_size;
-
-    // result = SCardTransmit(card, SCARD_PCI_T1, 
-    //     send_buffer_01, sizeof(send_buffer_01), NULL,
-    //     recv_buffer, &recv_length);
-    // if (result != SCARD_S_SUCCESS) {
-    //     SCardDisconnect(card, SCARD_RESET_CARD);
-    //     SCardReleaseContext(sc_context);
-    //     printf("%s\n", pcsc_stringify_error(result));
-    //     return 1;
-    // }
-
-    // printf("Got response (len %i): ", recv_length);
-    // print_bytes(recv_buffer, recv_length);
 
     // disconnect from card
     result = SCardDisconnect(card, SCARD_RESET_CARD);
