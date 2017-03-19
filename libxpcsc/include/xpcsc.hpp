@@ -43,6 +43,8 @@ const unsigned char CLA_PICC = 0xff;
 
 // INS
 const unsigned char INS_MIFARE_LOAD_KEYS = 0x82;
+const unsigned char INS_MIFARE_GENERAL_AUTH = 0x86;
+const unsigned char INS_MIFARE_READ_BINARY = 0xb0;
 
 // ATR features constants
 typedef enum { 
@@ -91,6 +93,8 @@ public:
     Bytes atr();
 
     void transmit(const Bytes & command, Bytes * response = 0);
+
+    static int response_status(const Bytes & response);
 
 private:
     struct Private;

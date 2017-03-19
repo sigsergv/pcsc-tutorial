@@ -154,7 +154,7 @@ void Connection::transmit(const Bytes & command, Bytes * response)
     LONG send_buffer_size = command.length();
     DWORD recv_length = recv_buffer_size;
 
-    PRINT_DEBUG("[D] Command length: " << send_buffer_size);
+    // PRINT_DEBUG("[D] Command length: " << send_buffer_size);
 
     unsigned char *recv_buffer = new unsigned char[recv_buffer_size];
 
@@ -173,6 +173,17 @@ void Connection::transmit(const Bytes & command, Bytes * response)
     if (response != 0) {
         response->assign(recv_buffer, recv_length);
     }
+}
+
+
+int Connection::response_status(const Bytes & response)
+{
+    size_t size = response.size();
+    if (size < 2) {
+        return -1;
+    }
+
+    return response.at(size-2)*256 + response.at(size-1);
 }
 
 /*
