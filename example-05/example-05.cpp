@@ -31,13 +31,20 @@
 
 #include <string.h>
 
+#define CHECK_BIT(value, b) (((value) >> (b-1))&1)
 
 typedef enum {Key_None, Key_A, Key_B} CardBlockKeyType;
-
+struct AccessBits {
+    unsigned char C1 : 1, C2 : 1, C3 :1;
+    bool is_set;
+    AccessBits() : is_set(false) {};
+};
 struct CardContents {
     unsigned char blocks_data[64][16];
     unsigned char blocks_keys[64][6];
+
     CardBlockKeyType blocks_key_types[64];
+    AccessBits blocks_access_bits[64];
 };
 
 int main(int argc, char **argv)
@@ -81,46 +88,48 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // template for Load Keys command
     unsigned char cmd_load_keys[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
         0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
+    // template for General Auth command
     unsigned char cmd_general_auth[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
         0x05, 0x01, 0x00, 0x00, 0x60, 0x00};
 
+    // template for Read Binary command
     unsigned char cmd_read_binary[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
 
     // standard keys
-    const size_t keys_number = 6;
+    const size_t keys_number = 2;
     unsigned char keys[keys_number][6] = {
         {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},  // NXP factory default key
         {0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5},  // Infineon factory default key
-        {0xd3, 0xf7, 0xd3, 0xf7, 0xd3, 0xf7},
-        {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff},
-        {0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5},
-        {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+        // {0xd3, 0xf7, 0xd3, 0xf7, 0xd3, 0xf7},
+        // {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff},
+        // {0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5},
+        // {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
     };
 
-    xpcsc::Bytes command;
-    xpcsc::Bytes response;
     std::string str_keys[keys_number];
 
     for (size_t i=0; i<keys_number; i++) {
         str_keys[i] = xpcsc::format(xpcsc::Bytes(keys[i], 6));
     }
 
-    CardContents card;
-    memset(card.blocks_data, 64*16, 0);
+    xpcsc::Bytes command;
+    xpcsc::Bytes response;
 
-    // walk through all sectors and try to read data
+    CardContents card;
 
     std::stringstream s1;
     std::stringstream s2;
 
+    // prepare display
     s1 << "Sectors: ";
     s2 << "Blocks:  ";
     char buf[10];
 
-    for (size_t i=0; i<16; i++) {
+    for (unsigned char i=0; i<16; i++) {
         snprintf(buf, 6, "0x%01X   ", i);
         s1 << buf;
         s2 << "==== ";
@@ -129,6 +138,7 @@ int main(int argc, char **argv)
     std::cout << s1.str() << std::endl;
     std::cout << s2.str() << std::endl;
 
+    // walk through all sectors and try to read data
     std::cout << "         ";
     size_t block = -1;
     for (size_t sector=0; sector<0x10; sector++) {
@@ -142,6 +152,8 @@ int main(int argc, char **argv)
 
             for (k=0; k<keys_number; k++) {
                 // trying key "keys[k]"
+
+                // load key bytes into Load Keys command template and execute
                 memcpy(cmd_load_keys+5, keys[k], 6);
                 command.assign(cmd_load_keys, 11);
                 c.transmit(command, &response);
@@ -151,6 +163,7 @@ int main(int argc, char **argv)
                 }
 
                 // ok, check with Key A
+                // load key bytes into General Auth command template
                 cmd_general_auth[7] = block;
                 cmd_general_auth[8] = 0x60;
                 command.assign(cmd_general_auth, 10);
@@ -158,7 +171,7 @@ int main(int argc, char **argv)
                 if (c.response_status(response) == 0x9000) {
                     key_a_found = true;
                 } else {
-                    //ok, check with Key B
+                    // check with Key B
                     cmd_general_auth[8] = 0x61;
                     command.assign(cmd_general_auth, 10);
                     c.transmit(command, &response);
@@ -173,6 +186,7 @@ int main(int argc, char **argv)
             }
 
             if (key_a_found || key_b_found) {
+                // prepare Read Binary command
                 cmd_read_binary[3] = block;
                 command.assign(cmd_read_binary, 5);
                 c.transmit(command, &response);
@@ -188,7 +202,33 @@ int main(int argc, char **argv)
                     }
                     memcpy(card.blocks_data[block], response.data(), 16);
                     if (j == 3) {
+                        const unsigned char *sector_trailer = response.data();
                         // parse special block
+                        // extract access bits from access bytes
+                        // bits for blocks: block, block-1, block-2, block-3
+                        unsigned char b6 = sector_trailer[6];
+                        unsigned char b7 = sector_trailer[7];
+                        unsigned char b8 = sector_trailer[8];
+
+                        card.blocks_access_bits[block-3].is_set = true;
+                        card.blocks_access_bits[block-3].C1 = CHECK_BIT(b7, 5);
+                        card.blocks_access_bits[block-3].C2 = CHECK_BIT(b8, 1);
+                        card.blocks_access_bits[block-3].C3 = CHECK_BIT(b8, 4);
+
+                        card.blocks_access_bits[block-2].is_set = true;
+                        card.blocks_access_bits[block-2].C1 = CHECK_BIT(b7, 6);
+                        card.blocks_access_bits[block-2].C2 = CHECK_BIT(b8, 2);
+                        card.blocks_access_bits[block-2].C3 = CHECK_BIT(b8, 6);
+
+                        card.blocks_access_bits[block-1].is_set = true;
+                        card.blocks_access_bits[block-1].C1 = CHECK_BIT(b7, 7);
+                        card.blocks_access_bits[block-1].C2 = CHECK_BIT(b8, 3);
+                        card.blocks_access_bits[block-1].C3 = CHECK_BIT(b8, 7);
+
+                        card.blocks_access_bits[block].is_set = true;
+                        card.blocks_access_bits[block].C1 = CHECK_BIT(b7, 8);
+                        card.blocks_access_bits[block].C2 = CHECK_BIT(b8, 5);
+                        card.blocks_access_bits[block].C3 = CHECK_BIT(b8, 8);
                     }
                 }
             } else {
@@ -202,46 +242,43 @@ int main(int argc, char **argv)
 
     std::cout << std::endl;
 
+    std::cout << "       DATA                                     | KEY                      | ACCESS BITS" << std::endl;
+    std::cout << "                                                |                          |  C1 C2 C3 " << std::endl;
+
     // print card contents
     xpcsc::Bytes key;
     for (size_t i=0; i<64; i++) {
         xpcsc::Bytes row(card.blocks_data[i], 16);
         if (card.blocks_key_types[i] == Key_None) {
-            std::cout << "?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ??" << std::endl;
-            continue;
-        }
-        key.assign(card.blocks_keys[i], 6);
-        // print row of data first
-        std::cout << xpcsc::format(row) << " | Key ";
-        // key next
-        if (card.blocks_key_types[i] == Key_A) {
-            std::cout << "A: ";
-        } else if (card.blocks_key_types[i] == Key_B) {
-            std::cout << "B: ";
+            std::cout << "?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ??";
+            std::cout << "                            | ";
         } else {
-            std::cout << " : ";
-        }
-        std::cout << xpcsc::format(key);
+            key.assign(card.blocks_keys[i], 6);
 
+            // print row of data first
+            std::cout << xpcsc::format(row) << " | Key ";
+            // key next
+            if (card.blocks_key_types[i] == Key_A) {
+                std::cout << "A: ";
+            } else if (card.blocks_key_types[i] == Key_B) {
+                std::cout << "B: ";
+            } else {
+                std::cout << " : ";
+            }
+            std::cout << xpcsc::format(key) << " | ";
+            
+        }
+        // render access bits
+        if (card.blocks_access_bits[i].is_set) {
+            std::cout << " " \
+                << int(card.blocks_access_bits[i].C1) << "  " \
+                << int(card.blocks_access_bits[i].C2) << "  " \
+                << int(card.blocks_access_bits[i].C3);
+        }
         std::cout << std::endl;
     }
 
     std::cout << std::endl;
-
-    // std::cout << p.str() << std::endl;
-    // const unsigned char cmd_1_buf[] = {
-    //     xpcsc::CLA_PICC,
-    //     xpcsc::INS_MIFARE_LOAD_KEYS,
-    //     0x00, // P1
-    //     0x00, // P2
-    //     0x06, // Lc
-    //     0xff,0xff,0xff,0xff,0xff,0xff
-    // };
-    // xpcsc::Bytes cmd_1(cmd_1_buf, sizeof(cmd_1_buf));
-    // xpcsc::Bytes response;
-
-    // c.transmit(cmd_1, &response);
-    // std::cout << "Response: " << xpcsc::format(response) << std::endl;
 
     return 0;
 }
