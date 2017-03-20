@@ -27,9 +27,18 @@
 
 #include <xpcsc.hpp>
 #include <iostream>
+#include <sstream>
 
-// for memcpy
 #include <string.h>
+
+
+typedef enum {Key_None, Key_A, Key_B} CardBlockKeyType;
+
+struct CardContents {
+    unsigned char blocks_data[64][16];
+    unsigned char blocks_keys[64][6];
+    CardBlockKeyType blocks_key_types[64];
+};
 
 int main(int argc, char **argv)
 {
@@ -81,70 +90,143 @@ int main(int argc, char **argv)
     unsigned char cmd_read_binary[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
 
     // standard keys
-    const size_t keys_number = 4;
+    const size_t keys_number = 6;
     unsigned char keys[keys_number][6] = {
-        {0xff,0xff,0xff,0xff,0xff,0xff},  // NXP factory default key
-        {0xa0,0xa1,0xa2,0xa3,0xa4,0xa5},  // 
-        {0xd3,0xf7,0xd3,0xf7,0xd3,0xf7},
-        {0xaa,0xbb,0xcc,0xdd,0xee,0xff}
+        {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},  // NXP factory default key
+        {0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5},  // Infineon factory default key
+        {0xd3, 0xf7, 0xd3, 0xf7, 0xd3, 0xf7},
+        {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff},
+        {0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5},
+        {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
     };
 
     xpcsc::Bytes command;
     xpcsc::Bytes response;
+    std::string str_keys[keys_number];
 
-    // we have 16 sectors and 64 blocks ahead
+    for (size_t i=0; i<keys_number; i++) {
+        str_keys[i] = xpcsc::format(xpcsc::Bytes(keys[i], 6));
+    }
+
+    CardContents card;
+    memset(card.blocks_data, 64*16, 0);
+
+    // walk through all sectors and try to read data
+
+    std::stringstream s1;
+    std::stringstream s2;
+
+    s1 << "Sectors: ";
+    s2 << "Blocks:  ";
+    char buf[10];
+
+    for (size_t i=0; i<16; i++) {
+        snprintf(buf, 6, "0x%01X   ", i);
+        s1 << buf;
+        s2 << "==== ";
+    }
+
+    std::cout << s1.str() << std::endl;
+    std::cout << s2.str() << std::endl;
+
+    std::cout << "         ";
     size_t block = -1;
-    for (size_t i=0; i<0x10; i++) {
-        std::cout << "---------------------------" << std::endl;
-        std::cout << "Sector: " << i << std::endl;
-        // 3 regular blocks
-        for (size_t j=0; j<3; j++) {
+    for (size_t sector=0; sector<0x10; sector++) {
+        for (size_t j=0; j<4; j++) {
             block++;
+
+            // number of matched key
             size_t k;
-            bool key_found = false;
-            std::cout << " block: " << block << std::endl;
+            bool key_a_found = false;
+            bool key_b_found = false;
 
             for (k=0; k<keys_number; k++) {
-                std::cout << "  trying key " << k << " ";
-
+                // trying key "keys[k]"
                 memcpy(cmd_load_keys+5, keys[k], 6);
                 command.assign(cmd_load_keys, 11);
                 c.transmit(command, &response);
                 if (c.response_status(response) != 0x9000) {
-                    std::cout << " .. failed" << std::endl;
+                    // next key
                     continue;
                 }
 
-                // ok, now try auth
+                // ok, check with Key A
                 cmd_general_auth[7] = block;
+                cmd_general_auth[8] = 0x60;
                 command.assign(cmd_general_auth, 10);
                 c.transmit(command, &response);
-                if (c.response_status(response) != 0x9000) {
-                    std::cout << " .. failed" << std::endl;
-                    continue;
+                if (c.response_status(response) == 0x9000) {
+                    key_a_found = true;
+                } else {
+                    //ok, check with Key B
+                    cmd_general_auth[8] = 0x61;
+                    command.assign(cmd_general_auth, 10);
+                    c.transmit(command, &response);
+                    if (c.response_status(response) == 0x9000) {
+                        key_b_found = true;
+                    }
                 }
 
-                std::cout << " .. success!" << std::endl;
-                key_found = true;
-                break;
+                if (key_a_found || key_b_found) {
+                    break;
+                }
             }
 
-            if (key_found) {
-                // we can try to read block using key
+            if (key_a_found || key_b_found) {
                 cmd_read_binary[3] = block;
                 command.assign(cmd_read_binary, 5);
                 c.transmit(command, &response);
                 if (c.response_status(response) != 0x9000) {
-                    std::cout << "  failed to read block data" << std::endl;
+                    std::cout << "!" << std::flush; // failed to read block
                 } else {
-                    std::cout << "  " << xpcsc::format(response.substr(0, response.size()-2)) << std::endl;
+                    memcpy(card.blocks_keys[block], keys[k], 6);
+                    std::cout << "+" << std::flush;
+                    if (key_a_found) {
+                        card.blocks_key_types[block] = Key_A;
+                    } else {
+                        card.blocks_key_types[block] = Key_B;
+                    }
+                    memcpy(card.blocks_data[block], response.data(), 16);
+                    if (j == 3) {
+                        // parse special block
+                    }
                 }
+            } else {
+                card.blocks_key_types[block] = Key_None;
+                std::cout << "-" << std::flush;
             }
         }
-
-        // and one special with keys and access bits
-        block++;
+        std::cout << " " << std::flush;
+        // break; 
     }
+
+    std::cout << std::endl;
+
+    // print card contents
+    xpcsc::Bytes key;
+    for (size_t i=0; i<64; i++) {
+        xpcsc::Bytes row(card.blocks_data[i], 16);
+        if (card.blocks_key_types[i] == Key_None) {
+            std::cout << "?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ??" << std::endl;
+            continue;
+        }
+        key.assign(card.blocks_keys[i], 6);
+        // print row of data first
+        std::cout << xpcsc::format(row) << " | Key ";
+        // key next
+        if (card.blocks_key_types[i] == Key_A) {
+            std::cout << "A: ";
+        } else if (card.blocks_key_types[i] == Key_B) {
+            std::cout << "B: ";
+        } else {
+            std::cout << " : ";
+        }
+        std::cout << xpcsc::format(key);
+
+        std::cout << std::endl;
+    }
+
+    std::cout << std::endl;
 
     // std::cout << p.str() << std::endl;
     // const unsigned char cmd_1_buf[] = {
