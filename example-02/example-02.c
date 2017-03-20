@@ -115,10 +115,10 @@ int main(int argc, char **argv)
     }
 
     if (active_protocol == SCARD_PROTOCOL_T0) {
-        printf("Card connected, protocol to use: T0.\n");
+        printf("  Card connected, selected protocol: T0.\n");
     }
     if (active_protocol == SCARD_PROTOCOL_T1) {
-        printf("Card connected, protocol to use: T1.\n");
+        printf("  Card connected, selected protocol: T1.\n");
     }
 
     // fetch reader status
@@ -138,7 +138,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    printf("Card ATR: ");
+    printf("  Card ATR: ");
     print_bytes(atr, atr_size);
 
     // disconnect from card

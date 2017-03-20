@@ -141,9 +141,9 @@ int main(int argc, char **argv)
 
     BYTE SW1 = recv_buffer[recv_length-2];
     BYTE SW2 = recv_buffer[recv_length-1];
-    int SW12 = SW1*256 + SW2;
+    int SW = SW1*256 + SW2;
 
-    if (SW12 != 0x9000) {
+    if (SW != 0x9000) {
         printf("Failed to fetch UID! SW1=%02X, SW2=%02X\n", SW1, SW2);
     } else {
         printf("Success!\n");
