@@ -95,6 +95,7 @@ public:
     void transmit(const Bytes & command, Bytes * response = 0);
 
     static int response_status(const Bytes & response);
+    static std::string response_status_str(const Bytes & response);
 
 private:
     struct Private;
