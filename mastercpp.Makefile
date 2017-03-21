@@ -15,7 +15,7 @@ endif
 all: $(BINARY)
 	
 $(BINARY): libxpcsc $(OBJS)
-	g++ -g -o $@ $(OBJS) $(CCFLAGS) $(LDFLAGS)
+	g++ -g -o $@ $(OBJS) $(CPPFLAGS) $(LDFLAGS)
 
 libxpcsc:
 	cd ../libxpcsc && make
