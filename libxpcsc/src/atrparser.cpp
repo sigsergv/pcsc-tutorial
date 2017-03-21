@@ -77,9 +77,6 @@ static void initRIDMap();
 static std::string decodeRID(const Bytes &);
 static std::string decodeCardName(const Bytes &, const Bytes &);
 
-// std::map<std::string, std::string> ATRParser::Private::RID_map;
-// std::map<std::string, std::string> ATRParser::Private::PCSC_cardnames_map;
-
 ATRParser::ATRParser()
 {
     p = new Private;
@@ -478,10 +475,15 @@ static const size_t RID_map_size = 1;
 static const char * RID_map_keys[RID_map_size] = {"A0 00 00 03 06"};
 static const char * RID_map_values[RID_map_size] = {"PC/SC Workgroup"};
 
-static const size_t PCSC_cardnames_map_size = 7;
-static int PCSC_cardnames_map_keys[PCSC_cardnames_map_size] = {0x0001, 0x0002, 0x0003, 0x0026, 0xf004, 0xf011, 0xf012};
-static const char * PCSC_cardnames_map_values[PCSC_cardnames_map_size] = {"MIFARE Classic 1K", "MIFARE Classic 4K", 
-    "MIFARE Ultralight", "MIFARE Mini", "Topaz and Jewel", "FeliCa 212K", "FeliCa 242K"};
+static const size_t PCSC_cardnames_map_size = 8;
+static int PCSC_cardnames_map_keys[PCSC_cardnames_map_size] = {
+    0x0001, 0x0002, 0x0003, 
+    0x0026, 0xf004, 0xf011, 
+    0xf012, 0xff88};
+static const char * PCSC_cardnames_map_values[PCSC_cardnames_map_size] = {
+    "MIFARE Classic 1K", "MIFARE Classic 4K",  "MIFARE Ultralight", 
+    "MIFARE Mini", "Topaz and Jewel", "FeliCa 212K", 
+    "FeliCa 242K", "Infineon Mifare SLE 66R35"};
 
 
 static void initRIDMap()
@@ -516,14 +518,16 @@ static std::string decodeRID(const Bytes & rid)
 static std::string decodeCardName(const Bytes & rid, const Bytes & card_name)
 {
     std::stringstream ss;
-    int card = card_name.at(1)*255 + card_name.at(0);
+    unsigned char c1 = card_name.at(1);
+    unsigned char c2 = card_name.at(0);
+    int card = c2*256 + c1;
 
     if (format(rid).compare("A0 00 00 03 06") == 0) {
         if (PCSC_cardnames_map.find(card) != PCSC_cardnames_map.end()) {
             ss << PCSC_cardnames_map[card] << " / ";
         }
     }
-    ss << card;
+    ss << format(c2) << " " << format(c1);
     return ss.str();
 }
 
