@@ -1,9 +1,5 @@
-
-BINARIES := scan_atr scan_atr_file test_atr_parser
-COMMON_OBJS := pcsc_context.o bytes_list.o atr_parser.o
-
-CPPFLAGS := 
-LDFLAGS := 
+CPPFLAGS := -I../libxpcsc/include
+LDFLAGS := ../libxpcsc/libxpcsc.a
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
@@ -15,23 +11,18 @@ ifeq ($(UNAME_S),Darwin)
 	LDFLAGS += -framework PCSC
 endif
 
-ifneq ($(DEBUG),)
-	CPPFLAGS += -DDEBUG
-endif
-
-all: $(BINARIES)
+all: read-atr
 	
-scan_atr: scan_atr.o $(COMMON_OBJS)
-	g++ -g -o $@ $^ $(LDFLAGS)
+read-atr: libxpcsc read-atr.o
+	g++ -g -o $@ read-atr.o $(CPPFLAGS) $(LDFLAGS)
 
-scan_atr_file: scan_atr_file.o $(COMMON_OBJS)
-	g++ -g -o $@ $^ $(LDFLAGS)
-
-test_atr_parser: test_atr_parser.o $(COMMON_OBJS)
-	g++ -g -o $@ $^ $(LDFLAGS)
+libxpcsc:
+	cd ../libxpcsc && make
 
 clean:
-	rm -f $(BINARIES) *.o
+	rm -f $(BINARY) $(OBJS)
 
-%.o: %.cpp %.h
+%.o: %.cpp
 	g++ -Wall -c -o $@ $< $(CPPFLAGS)
+
+.PHONY: libxpcsc

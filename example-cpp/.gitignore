@@ -1,5 +1,1 @@
-*.o
-/atr_parse
-/scan_atr
-/scan_atr_file
-/test_atr_parser
+/read-atr
