@@ -30,6 +30,7 @@
 #include <sstream>
 
 #include <string.h>
+#include <unistd.h>
 
 #define CHECK_BIT(value, b) (((value) >> (b))&1)
 
@@ -103,7 +104,7 @@ int main(int argc, char **argv)
     const size_t keys_number = 2;
     unsigned char keys[keys_number][6] = {
         {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},  // NXP factory default key
-        {0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5},  // Infineon factory default key
+        {0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5}  // Infineon factory default key
         // {0xd3, 0xf7, 0xd3, 0xf7, 0xd3, 0xf7},
         // {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff},
         // {0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5},
@@ -140,114 +141,126 @@ int main(int argc, char **argv)
 
     // walk through all sectors and try to read data
     std::cout << "         ";
-    size_t block = -1;
-    for (size_t sector=0; sector<0x10; sector++) {
-        for (size_t j=0; j<4; j++) {
-            block++;
+    for (size_t sector = 0; sector < 16; sector++) {
+        size_t first_block = sector * 4;
+        size_t k;
 
-            // number of matched key
-            size_t k;
-            bool key_a_found = false;
-            bool key_b_found = false;
+        bool key_found = false;
 
-            for (k=0; k<keys_number; k++) {
-                // trying key "keys[k]"
+        for (k=0; k<keys_number; k++) {
+            // try to authenticate on first sector
 
-                // load key bytes into Load Keys command template and execute
-                memcpy(cmd_load_keys+5, keys[k], 6);
-                command.assign(cmd_load_keys, 11);
-                c.transmit(command, &response);
-                if (c.response_status(response) != 0x9000) {
-                    // next key
-                    continue;
-                }
+            // first load key into a terminal 
+            memcpy(cmd_load_keys+5, keys[k], 6);
+            command.assign(cmd_load_keys, 11);
+            c.transmit(command, &response);
+            if (c.response_status(response) != 0x9000) {
+                // next key
+                continue;
+            }
 
-                // ok, check with Key A
-                // load key bytes into General Auth command template
-                cmd_general_auth[7] = block;
-                cmd_general_auth[8] = 0x60;
-                command.assign(cmd_general_auth, 10);
-                c.transmit(command, &response);
-                if (c.response_status(response) == 0x9000) {
-                    key_a_found = true;
-                } else {
-                    // check with Key B
-                    cmd_general_auth[8] = 0x61;
-                    command.assign(cmd_general_auth, 10);
+            // usleep(1700000);
+
+            // authenticate as Key B
+            cmd_general_auth[7] = first_block;
+            cmd_general_auth[8] = 0x61;
+            command.assign(cmd_general_auth, 10);
+            c.transmit(command, &response);
+            if (c.response_status(response) == 0x9000) {
+                // success, try to read data from all blocks (for this sector only!):
+                for (size_t i=0; i<4; i++) {
+                    size_t block = first_block+i;
+                    cmd_read_binary[3] = block;
+                    command.assign(cmd_read_binary, 5);
                     c.transmit(command, &response);
-                    if (c.response_status(response) == 0x9000) {
-                        key_b_found = true;
+                    if (c.response_status(response) != 0x9000) {
+                        // failed to read block
+                        // std::cerr << "[Failed read] Key B " << block << ", key: " << str_keys[k] << std::endl;
+                        return 1;
+                    } else {
+                        memcpy(card.blocks_keys[block], keys[k], 6);
+                        card.blocks_key_types[block] = Key_B;
+                        memcpy(card.blocks_data[block], response.data(), 16);
+                        key_found = true;
                     }
-                }
-
-                if (key_a_found || key_b_found) {
-                    break;
                 }
             }
 
-            if (key_a_found || key_b_found) {
-                // prepare Read Binary command
-                cmd_read_binary[3] = block;
-                command.assign(cmd_read_binary, 5);
-                c.transmit(command, &response);
-                if (c.response_status(response) != 0x9000) {
-                    std::cout << "!" << std::flush; // failed to read block
-                } else {
-                    memcpy(card.blocks_keys[block], keys[k], 6);
-                    std::cout << "+" << std::flush;
-                    if (key_a_found) {
-                        card.blocks_key_types[block] = Key_A;
+            // usleep(1700000);
+
+            // authenticate as Key A
+            cmd_general_auth[7] = first_block;
+            cmd_general_auth[8] = 0x60;
+            command.assign(cmd_general_auth, 10);
+            c.transmit(command, &response);
+            if (c.response_status(response) == 0x9000) {
+                // success, try to read data from all blocks (for this sector only!):
+                for (size_t i=0; i<4; i++) {
+                    size_t block = first_block+i;
+                    cmd_read_binary[3] = block;
+                    command.assign(cmd_read_binary, 5);
+                    c.transmit(command, &response);
+                    if (c.response_status(response) != 0x9000) {
+                        // failed to read block
+                        // std::cerr << "[Failed read] Key A " << block << ", key: " << str_keys[k] << std::endl;
                     } else {
-                        card.blocks_key_types[block] = Key_B;
-                    }
-                    memcpy(card.blocks_data[block], response.data(), 16);
-                    if (j == 3) {
-                        const unsigned char *sector_trailer = response.data();
-                        // parse special block
-                        // extract access bits from access bytes
-                        // bits for blocks: block, block-1, block-2, block-3
-                        unsigned char b6 = sector_trailer[6];
-                        unsigned char b7 = sector_trailer[7];
-                        unsigned char b8 = sector_trailer[8];
-
-                        card.blocks_access_bits[block-3].is_set = true;
-                        card.blocks_access_bits[block-3].C1 = CHECK_BIT(b7, 4);
-                        card.blocks_access_bits[block-3].C2 = CHECK_BIT(b8, 0);
-                        card.blocks_access_bits[block-3].C3 = CHECK_BIT(b8, 3);
-
-                        card.blocks_access_bits[block-2].is_set = true;
-                        card.blocks_access_bits[block-2].C1 = CHECK_BIT(b7, 5);
-                        card.blocks_access_bits[block-2].C2 = CHECK_BIT(b8, 1);
-                        card.blocks_access_bits[block-2].C3 = CHECK_BIT(b8, 5);
-
-                        card.blocks_access_bits[block-1].is_set = true;
-                        card.blocks_access_bits[block-1].C1 = CHECK_BIT(b7, 6);
-                        card.blocks_access_bits[block-1].C2 = CHECK_BIT(b8, 2);
-                        card.blocks_access_bits[block-1].C3 = CHECK_BIT(b8, 6);
-
-                        card.blocks_access_bits[block].is_set = true;
-                        card.blocks_access_bits[block].C1 = CHECK_BIT(b7, 7);
-                        card.blocks_access_bits[block].C2 = CHECK_BIT(b8, 4);
-                        card.blocks_access_bits[block].C3 = CHECK_BIT(b8, 7);
+                        memcpy(card.blocks_keys[block], keys[k], 6);
+                        card.blocks_key_types[block] = Key_A;
+                        memcpy(card.blocks_data[block], response.data(), 16);
+                        key_found = true;
                     }
                 }
-            } else {
-                card.blocks_key_types[block] = Key_None;
-                std::cout << "-" << std::flush;
+            }
+
+            if (key_found) {
+                break;
             }
         }
-        std::cout << " " << std::flush;
-        // break; 
+
+        if (key_found) {
+            std::cout << "++++ " << std::flush;        
+            // read access bits
+            size_t block = sector * 4 + 3;
+            const unsigned char *sector_trailer = card.blocks_data[block];
+
+            unsigned char b7 = sector_trailer[7];
+            unsigned char b8 = sector_trailer[8];
+
+            card.blocks_access_bits[block-3].is_set = true;
+            card.blocks_access_bits[block-3].C1 = CHECK_BIT(b7, 4);
+            card.blocks_access_bits[block-3].C2 = CHECK_BIT(b8, 0);
+            card.blocks_access_bits[block-3].C3 = CHECK_BIT(b8, 4);
+
+            card.blocks_access_bits[block-2].is_set = true;
+            card.blocks_access_bits[block-2].C1 = CHECK_BIT(b7, 5);
+            card.blocks_access_bits[block-2].C2 = CHECK_BIT(b8, 1);
+            card.blocks_access_bits[block-2].C3 = CHECK_BIT(b8, 5);
+
+            card.blocks_access_bits[block-1].is_set = true;
+            card.blocks_access_bits[block-1].C1 = CHECK_BIT(b7, 6);
+            card.blocks_access_bits[block-1].C2 = CHECK_BIT(b8, 2);
+            card.blocks_access_bits[block-1].C3 = CHECK_BIT(b8, 6);
+
+            card.blocks_access_bits[block].is_set = true;
+            card.blocks_access_bits[block].C1 = CHECK_BIT(b7, 7);
+            card.blocks_access_bits[block].C2 = CHECK_BIT(b8, 3);
+            card.blocks_access_bits[block].C3 = CHECK_BIT(b8, 7);
+
+        } else {
+            std::cout << "---- " << std::flush;        
+        }
     }
 
     std::cout << std::endl;
 
-    std::cout << "       DATA                                     | KEY                      | ACCESS BITS" << std::endl;
-    std::cout << "                                                |                          |  C1 C2 C3 " << std::endl;
+    std::cout << "BLOCK|       DATA                                      | KEY                      | ACCESS BITS" << std::endl;
+    std::cout << "     |                                                 |                          |  C1 C2 C3 " << std::endl;
 
     // print card contents
     xpcsc::Bytes key;
     for (size_t i=0; i<64; i++) {
+        std::cout << "0x" << xpcsc::format((unsigned char)i) << " | ";
+
         xpcsc::Bytes row(card.blocks_data[i], 16);
         if (card.blocks_key_types[i] == Key_None) {
             std::cout << "?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ??";
