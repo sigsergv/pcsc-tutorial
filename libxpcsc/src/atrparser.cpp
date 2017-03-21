@@ -49,7 +49,7 @@ namespace xpcsc {
 #define LN(x) (x & 0xf)
 
 // check bit: 1,2,...
-#define CHECK_BIT(value, b) (((value) >> (b-1))&1)
+#define CHECK_BIT(value, b) (((value) >> (b))&1)
 
 typedef enum {ATRNONE, TS, T0, TA1, TB1, TC1, TD1, 
     TA2, TB2, TC2, TD2, 
@@ -149,28 +149,28 @@ void ATRParser::load(const Bytes & bytes)
             throw ATRParseError("too much interface bytes");
         }
         // check presense of TAi
-        if (CHECK_BIT(TD_p, 5)) {
+        if (CHECK_BIT(TD_p, 4)) {
             // next byte is TAi, remember it
             pos++;
             b = bytes.at(pos);
             p->fields[sections_TA[i]] = b;
         }
         // check presense of TBi
-        if (CHECK_BIT(TD_p, 6)) {
+        if (CHECK_BIT(TD_p, 5)) {
             // next byte is TBi, remember it
             pos++;
             b = bytes.at(pos);
             p->fields[sections_TB[i]] = b;
         }
         // check presense of TCi
-        if (CHECK_BIT(TD_p, 7)) {
+        if (CHECK_BIT(TD_p, 6)) {
             // next byte is TCi, remember it
             pos++;
             b = bytes.at(pos);
             p->fields[sections_TC[i]] = b;
         }
         // check presense of TDi
-        if (CHECK_BIT(TD_p, 8)) {
+        if (CHECK_BIT(TD_p, 7)) {
             // next byte is TCi, remember it
             pos++;
             b = bytes.at(pos);

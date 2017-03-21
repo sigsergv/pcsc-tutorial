@@ -31,7 +31,7 @@
 
 #include <string.h>
 
-#define CHECK_BIT(value, b) (((value) >> (b-1))&1)
+#define CHECK_BIT(value, b) (((value) >> (b))&1)
 
 typedef enum {Key_None, Key_A, Key_B} CardBlockKeyType;
 struct AccessBits {
@@ -211,24 +211,24 @@ int main(int argc, char **argv)
                         unsigned char b8 = sector_trailer[8];
 
                         card.blocks_access_bits[block-3].is_set = true;
-                        card.blocks_access_bits[block-3].C1 = CHECK_BIT(b7, 5);
-                        card.blocks_access_bits[block-3].C2 = CHECK_BIT(b8, 1);
-                        card.blocks_access_bits[block-3].C3 = CHECK_BIT(b8, 4);
+                        card.blocks_access_bits[block-3].C1 = CHECK_BIT(b7, 4);
+                        card.blocks_access_bits[block-3].C2 = CHECK_BIT(b8, 0);
+                        card.blocks_access_bits[block-3].C3 = CHECK_BIT(b8, 3);
 
                         card.blocks_access_bits[block-2].is_set = true;
-                        card.blocks_access_bits[block-2].C1 = CHECK_BIT(b7, 6);
-                        card.blocks_access_bits[block-2].C2 = CHECK_BIT(b8, 2);
-                        card.blocks_access_bits[block-2].C3 = CHECK_BIT(b8, 6);
+                        card.blocks_access_bits[block-2].C1 = CHECK_BIT(b7, 5);
+                        card.blocks_access_bits[block-2].C2 = CHECK_BIT(b8, 1);
+                        card.blocks_access_bits[block-2].C3 = CHECK_BIT(b8, 5);
 
                         card.blocks_access_bits[block-1].is_set = true;
-                        card.blocks_access_bits[block-1].C1 = CHECK_BIT(b7, 7);
-                        card.blocks_access_bits[block-1].C2 = CHECK_BIT(b8, 3);
-                        card.blocks_access_bits[block-1].C3 = CHECK_BIT(b8, 7);
+                        card.blocks_access_bits[block-1].C1 = CHECK_BIT(b7, 6);
+                        card.blocks_access_bits[block-1].C2 = CHECK_BIT(b8, 2);
+                        card.blocks_access_bits[block-1].C3 = CHECK_BIT(b8, 6);
 
                         card.blocks_access_bits[block].is_set = true;
-                        card.blocks_access_bits[block].C1 = CHECK_BIT(b7, 8);
-                        card.blocks_access_bits[block].C2 = CHECK_BIT(b8, 5);
-                        card.blocks_access_bits[block].C3 = CHECK_BIT(b8, 8);
+                        card.blocks_access_bits[block].C1 = CHECK_BIT(b7, 7);
+                        card.blocks_access_bits[block].C2 = CHECK_BIT(b8, 4);
+                        card.blocks_access_bits[block].C3 = CHECK_BIT(b8, 7);
                     }
                 }
             } else {
