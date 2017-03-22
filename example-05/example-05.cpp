@@ -84,8 +84,11 @@ int main(int argc, char **argv)
     xpcsc::ATRParser p;
     p.load(atr);
 
-    if (!p.checkFeature(xpcsc::ATR_FEATURE_PICC) || !p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K)) {
-        std::cerr << "Not Mifare Classic 1K!" << std::endl;
+    if (!p.checkFeature(xpcsc::ATR_FEATURE_PICC)
+        || !(p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K)
+            || p.checkFeature(xpcsc::ATR_FEATURE_INFINEON_SLE_66R35) )
+    ) {
+        std::cerr << "Not compatible card!" << std::endl;
         return 1;
     }
 
@@ -248,6 +251,10 @@ int main(int argc, char **argv)
 
         } else {
             std::cout << "---- " << std::flush;        
+            for (size_t i=0; i<4; i++) {
+                size_t block = sector * 4 + i;
+                card.blocks_key_types[block] = Key_None;
+            }
         }
     }
 

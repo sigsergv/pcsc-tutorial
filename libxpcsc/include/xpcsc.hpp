@@ -54,7 +54,8 @@ typedef enum {
     ATR_FEATURE_PICC,
     // Mifare cards
     ATR_FEATURE_MIFARE_1K,
-    ATR_FEATURE_MIFARE_4K
+    ATR_FEATURE_MIFARE_4K,
+    ATR_FEATURE_INFINEON_SLE_66R35 
 } ATRFeature;
 
 /*

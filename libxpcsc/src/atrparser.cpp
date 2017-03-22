@@ -112,7 +112,6 @@ void ATRParser::load(const Bytes & bytes)
 
     unsigned char pos = 0;
     unsigned char b;
-    unsigned char mn;
 
     // byte: TS
     b = bytes.at(pos);
@@ -207,8 +206,6 @@ void ATRParser::load(const Bytes & bytes)
     }
     // PRINT_DEBUG("[E] position " << int(pos));
     // PRINT_DEBUG("[E] size " << int(size));
-
-    mn = HN(b);
 }
 
 std::string ATRParser::str() const
@@ -439,7 +436,6 @@ bool ATRParser::checkFeature(ATRFeature feature)
         {
             p->features.insert(ATR_FEATURE_PICC);
 
-            // check for mifare
             Bytes hb(p->hb, p->hb_size);
             if (p->hb_size >= 2 && hb.at(0) == 0x80 && hb.at(1) == 0x4f) {
                 Bytes RID = hb.substr(3, 5);
@@ -455,6 +451,10 @@ bool ATRParser::checkFeature(ATRFeature feature)
                     case 0x0003:
                     case 0x0026:
                         break;
+                    case 0xff88:
+                        p->features.insert(ATR_FEATURE_INFINEON_SLE_66R35);
+                        std::cout << "ATR_FEATURE_INFINEON_SLE_66R35" << std::endl;
+                        break;
                     }
                 }
             }
@@ -462,7 +462,6 @@ bool ATRParser::checkFeature(ATRFeature feature)
             p->features.insert(ATR_FEATURE_ICC);
         }
     }
-
 
     return p->features.find(feature) != p->features.end();
 }
@@ -483,7 +482,7 @@ static int PCSC_cardnames_map_keys[PCSC_cardnames_map_size] = {
 static const char * PCSC_cardnames_map_values[PCSC_cardnames_map_size] = {
     "MIFARE Classic 1K", "MIFARE Classic 4K",  "MIFARE Ultralight", 
     "MIFARE Mini", "Topaz and Jewel", "FeliCa 212K", 
-    "FeliCa 242K", "Infineon Mifare SLE 66R35"};
+    "FeliCa 242K", "Infineon SLE 66R35"};
 
 
 static void initRIDMap()
