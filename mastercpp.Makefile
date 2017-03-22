@@ -23,7 +23,7 @@ libxpcsc:
 clean:
 	rm -f $(BINARY) $(OBJS)
 
-%.o: %.cpp %.hpp
+%.o: %.cpp
 	g++ -Wall -c -o $@ $< $(CPPFLAGS)
 
 .PHONY: libxpcsc
