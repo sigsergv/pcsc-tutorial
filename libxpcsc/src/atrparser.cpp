@@ -453,7 +453,6 @@ bool ATRParser::checkFeature(ATRFeature feature)
                         break;
                     case 0xff88:
                         p->features.insert(ATR_FEATURE_INFINEON_SLE_66R35);
-                        std::cout << "ATR_FEATURE_INFINEON_SLE_66R35" << std::endl;
                         break;
                     }
                 }
