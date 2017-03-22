@@ -25,6 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * @file dump-atr.cpp
+ * @author Sergey Stolyarov <sergei@regolit.com>
+ *
+ * Scan card, print ATR and print detailed parsed ATR.
+ */
+
 #include <xpcsc.hpp>
 #include <iostream>
 #include <sstream>
@@ -34,5 +41,38 @@
 int main(int argc, char **argv)
 {
     xpcsc::Connection c;
+
+    try {
+        c.init();
+    } catch (xpcsc::PCSCError &e) {
+        std::cerr << "Connection to PC/SC failed: " << e.what() << std::endl;
+        return 1;
+    }
+
+    // get readers list
+    std::vector<std::string> readers = c.readers();
+    if (readers.size() == 0) {
+        std::cerr << "[E] No connected readers" << std::endl;
+        return 1;
+    }
+
+    // connect to reader
+    try {
+        std::string reader = *readers.begin();
+        std::cout << "Found reader: " << reader << std::endl;
+        c.wait_for_card(reader);
+    } catch (xpcsc::PCSCError &e) {
+        std::cerr << "Wait for card failed: " << e.what() << std::endl;
+        return 1;
+    }
+
+    // fetch and print ATR
+    xpcsc::Bytes atr = c.atr();
+    std::cout << "ATR: " << xpcsc::format(atr) << std::endl;
+
+    // parse ATR
+    xpcsc::ATRParser p;
+    p.load(atr);
     
+    std::cout << p.str() << std::endl;
 }

@@ -12,10 +12,13 @@ ifeq ($(UNAME_S),Darwin)
 	LDFLAGS += -framework PCSC
 endif
 
+ifneq ($(DEBUG),)
+	CPPFLAGS += -DDEBUG
+endif
+
 SIMPLE_BINARIES := dump-mifare-card dump-atr
 
 all: libxpcsc $(SIMPLE_BINARIES)
-
 
 libxpcsc:
 	cd ../libxpcsc && make
