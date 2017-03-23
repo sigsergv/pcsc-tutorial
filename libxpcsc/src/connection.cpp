@@ -196,6 +196,12 @@ std::string Connection::response_status_str(const Bytes & response)
     return format(response.substr(size-2, 2));
 }
 
+Bytes Connection::response_data(const Bytes & response)
+{
+    size_t size = response.size();
+    return response.substr(0, size-2);
+}
+
 /*
  * You should not call this function, it's for PCSC_CALL() macro.
  */

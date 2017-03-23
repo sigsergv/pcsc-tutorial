@@ -1,3 +1,4 @@
 /dump-atr
 /dump-mifare-card
+/cmd-get-data
 *.o

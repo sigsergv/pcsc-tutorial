@@ -95,7 +95,7 @@ typedef std::vector<Block> CardContents;
 void help(const std::string & program)
 {
     std::cout << "Usage:\n"
-        "    " << program << " [-h] [-f KEYS]";
+        "    " << program << " [-h] [-f KEYS_FILE]";
     std::cout << std::endl;
 }
 
@@ -503,7 +503,7 @@ int main(int argc, char **argv)
     // connect to reader
     try {
         std::string reader = *readers.begin();
-        std::cout << "Found reader: " << reader << std::endl;
+        PRINT_DEBUG("Found reader: " << reader);
         c.wait_for_card(reader);
     } catch (xpcsc::PCSCError &e) {
         std::cerr << "Wait for card failed: " << e.what() << std::endl;

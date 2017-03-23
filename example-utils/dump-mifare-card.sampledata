@@ -1,0 +1,20 @@
+# lines starting with # are ignored
+# empty lines are ignored too
+# each line must be filled as follows:
+#
+# SECTOR:KEY_A:KEY_B:KEY_USE
+#
+# where
+#   SECTOR is a sector number (0-based)
+#   KEY_A/KEY_B key written in hex form (12 hex digits), like aabbccddeeff or - if key is missing
+#   KEY_USE is a 4 characters string that specifies which key to use for each block, 
+#       like aaab or abba
+# so each row must look like this
+# 12:a0a1a2a3a4a5:ffffffffffff:aaab
+# or like this
+# 19:a0a1a2a3a4a5:-:aaaa
+
+1:ffffffffffff:112233445566:abaa
+2:0a0b0c0d0e0f:-:aaaa
+3:aAbBcCdDeEfF:1A9C009900a2:aBbA
+

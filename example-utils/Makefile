@@ -16,7 +16,7 @@ ifneq ($(DEBUG),)
 	CPPFLAGS += -DDEBUG
 endif
 
-SIMPLE_BINARIES := dump-mifare-card dump-atr
+SIMPLE_BINARIES := dump-mifare-card dump-atr cmd-get-data
 
 all: libxpcsc $(SIMPLE_BINARIES)
 
