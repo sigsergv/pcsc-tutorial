@@ -45,31 +45,51 @@
 
 #include "debug.hpp"
 
+#define CHECK_BIT(value, b) (((value) >> (b))&1)
+
 typedef enum {KeyA, KeyB, KeyNone} KeyType;
 typedef unsigned char Byte6[6];
 
-struct AccessBits {
-    unsigned char C1 : 1, C2 : 1, C3 :1;
-    bool is_set;
-    AccessBits() : is_set(false) {};
-};
-
+/*
+ * This structure represents one sector keys:
+ *   - Key A and Key B (presense and data)
+ *   - which blocks are read by key A
+ *   - which blocks are read by key B
+ */
 struct SectorKeys {
     Byte6 key_A;
-    bool Key_A_set;
+    char key_A_str[13];
     Byte6 key_B;
-    bool Key_B_set;
-    KeyType key_use[4];
+    char key_B_str[13];
+
+    size_t key_A_blocks_size;
+    int key_A_blocks[4];
+
+    size_t key_B_blocks_size;
+    int key_B_blocks[4];
 };
+
+/*
+ * This data structure maps sector numbers to SectorKeys structs
+ */
 typedef std::map<unsigned int, SectorKeys> Keys;
 
-struct CardContents {
-    unsigned char blocks_data[64][16];
-    unsigned char blocks_keys[64][6];
 
-    KeyType blocks_key_types[64];
-    AccessBits blocks_access_bits[64];
+/*
+ * This data structure represents one block: sector number, used key type, 16 bytes of data, access bits
+ */
+struct Block {
+    size_t sector;
+    KeyType key_type;
+    unsigned char data[16];
+
+    // access bits
+    bool is_access_set;
+    unsigned char C1 : 1, C2 : 1, C3 :1;
 };
+
+
+typedef std::vector<Block> CardContents;
 
 
 void help(const std::string & program)
@@ -207,8 +227,8 @@ bool read_keys(std::ifstream & file, Keys & keys)
                 error(line);
                 return false;
             }
+            strncpy(sks.key_A_str, tokens[1].c_str(), 13);
         }
-        sks.Key_A_set = !key_A_missing;
 
         // key B
         bool key_B_missing = false;
@@ -226,8 +246,8 @@ bool read_keys(std::ifstream & file, Keys & keys)
                 error(line);
                 return false;
             }
+            strncpy(sks.key_B_str, tokens[2].c_str(), 13);
         }
-        sks.Key_B_set = !key_B_missing;
 
         // key use
         if (tokens[3].length() != 4) {
@@ -238,15 +258,21 @@ bool read_keys(std::ifstream & file, Keys & keys)
         // each character must be either 'a' or 'b'
         bool found_key_use_a = false;
         bool found_key_use_b = false;
+
+        sks.key_A_blocks_size = 0;
+        sks.key_B_blocks_size = 0;
         for (size_t i=0; i < 4; i++) {
+            // blocks
             if (tokens[3][i] == 'a') {
                 found_key_use_a = true;
-                sks.key_use[i] = KeyA;
+                sks.key_A_blocks[sks.key_A_blocks_size] = i;
+                sks.key_A_blocks_size++;
                 continue;
             }
             if (tokens[3][i] == 'b') {
                 found_key_use_b = true;
-                sks.key_use[i] = KeyB;
+                sks.key_B_blocks[sks.key_B_blocks_size] = i;
+                sks.key_B_blocks_size++;
                 continue;
             }
             error("Invalid sector key line format [key use]: a and b required");
@@ -271,6 +297,150 @@ bool read_keys(std::ifstream & file, Keys & keys)
     return true;
 }
 
+bool read_mifare_1k(xpcsc::Connection & c, const Keys & keys, CardContents & card)
+{
+
+    unsigned char cmd_load_keys[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
+        0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+    // template for General Auth command
+    unsigned char cmd_general_auth[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
+        0x05, 0x01, 0x00, 0x00, 0x60, 0x00};
+
+    // template for Read Binary command
+    unsigned char cmd_read_binary[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
+
+    // 16 sectors, 4 blocks each
+    xpcsc::Bytes command;
+    xpcsc::Bytes response;
+
+    for (size_t sector = 0; sector < 16; sector++) {
+        const size_t first_block = sector * 4;
+
+        // initialize block with default data
+        for (size_t i=0; i < 4; i++) {
+            Block & b = card[first_block+i];
+            b.sector = sector;
+            b.key_type = KeyNone;
+            b.is_access_set = false;
+        }
+
+        Keys::const_iterator ps = keys.find(sector);
+        if (ps == keys.end()) {
+            // no key, all 4 blocks are not possible to read
+            continue;  // next sector
+        }
+
+        const SectorKeys & sector_keys = ps->second;
+
+        // Keys A first
+        if (sector_keys.key_A_blocks_size > 0) {
+            // there are  Key A blocks so authenticate as Key A
+            memcpy(cmd_load_keys+5, sector_keys.key_A, 6);
+            command.assign(cmd_load_keys, 11);
+            c.transmit(command, &response);
+            if (c.response_status(response) != 0x9000) {
+                error("Cannot load key A for sector" << sector );
+                continue;  // try next sector
+            }
+
+            cmd_general_auth[7] = first_block;
+            cmd_general_auth[8] = 0x60;
+            command.assign(cmd_general_auth, 10);
+            c.transmit(command, &response);
+            if (c.response_status(response) != 0x9000) {
+                error("Cannot use key A for sector " << sector << " auth.");
+                continue;  // try next sector
+            }
+
+            // read "sector_keys.key_A_blocks_size" blocks
+            for (size_t j = 0; j < sector_keys.key_A_blocks_size; j++) {
+                size_t block = first_block + sector_keys.key_A_blocks[j];
+                Block & b = card[block];
+
+                cmd_read_binary[3] = block;
+                command.assign(cmd_read_binary, 5);
+                c.transmit(command, &response);
+                if (c.response_status(response) != 0x9000) {
+                    error("Failed to read block " << block << " using key A " << sector_keys.key_A_str);
+                    continue;
+                }
+                memcpy(b.data, response.data(), 16);
+                b.key_type = KeyA;
+            }
+        }
+
+        if (sector_keys.key_B_blocks_size > 0) {
+            // there are  Key A blocks so authenticate as Key A
+            memcpy(cmd_load_keys+5, sector_keys.key_B, 6);
+            command.assign(cmd_load_keys, 11);
+            c.transmit(command, &response);
+            if (c.response_status(response) != 0x9000) {
+                error("Cannot load key B for sector" << sector );
+                continue;  // try next sector
+            }
+
+            cmd_general_auth[7] = first_block;
+            cmd_general_auth[8] = 0x61;
+            command.assign(cmd_general_auth, 10);
+            c.transmit(command, &response);
+            if (c.response_status(response) != 0x9000) {
+                error("Cannot use key B for sector " << sector << " auth.");
+                continue;  // try next sector
+            }
+
+            // read "sector_keys.key_B_blocks_size" blocks
+            for (size_t j = 0; j < sector_keys.key_B_blocks_size; j++) {
+                size_t block = first_block + sector_keys.key_B_blocks[j];
+                Block & b = card[block];
+
+                cmd_read_binary[3] = block;
+                command.assign(cmd_read_binary, 5);
+                c.transmit(command, &response);
+                if (c.response_status(response) != 0x9000) {
+                    error("Failed to read block " << block << " using key B " << sector_keys.key_B_str);
+                    continue;
+                }
+                memcpy(b.data, response.data(), 16);
+                b.key_type = KeyB;
+            }
+        }
+        
+        // fill access bits if they are available
+        Block & trailer = card[first_block+3];
+        Block * pblock;
+        if (trailer.key_type != KeyNone) {
+            unsigned char b7 = trailer.data[7];
+            unsigned char b8 = trailer.data[8];
+
+            pblock = &(card[first_block+0]);
+            pblock->is_access_set = true;
+            pblock->C1 = CHECK_BIT(b7, 4);
+            pblock->C2 = CHECK_BIT(b8, 0);
+            pblock->C3 = CHECK_BIT(b7, 4);
+
+            pblock = &(card[first_block+1]);
+            pblock->is_access_set = true;
+            pblock->C1 = CHECK_BIT(b7, 5);
+            pblock->C2 = CHECK_BIT(b8, 1);
+            pblock->C3 = CHECK_BIT(b7, 5);
+
+            pblock = &(card[first_block+2]);
+            pblock->is_access_set = true;
+            pblock->C1 = CHECK_BIT(b7, 6);
+            pblock->C2 = CHECK_BIT(b8, 2);
+            pblock->C3 = CHECK_BIT(b7, 6);
+
+            pblock = &(card[first_block+3]);
+            pblock->is_access_set = true;
+            pblock->C1 = CHECK_BIT(b7, 7);
+            pblock->C2 = CHECK_BIT(b8, 3);
+            pblock->C3 = CHECK_BIT(b7, 7);
+        }
+    }
+    return true;
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 1) {
@@ -280,7 +450,7 @@ int main(int argc, char **argv)
 
     // first parse command line arguments
     xpcsc::Strings args(argc);
-    for (size_t i=0; i < argc; i++) {
+    for (int i=0; i < argc; i++) {
         args.push_back(argv[i]);
     }
 
@@ -296,6 +466,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // STAGE 1
     // open file "keys_file" and read keys from there
     std::ifstream file;
     file.open(keys_file);
@@ -309,6 +480,9 @@ int main(int argc, char **argv)
     if (!read_keys(file, keys)) {
         return 1;
     }
+
+    // STAGE 2
+    // establish connection to reader and card
 
     xpcsc::Connection c;
 
@@ -341,45 +515,68 @@ int main(int argc, char **argv)
     xpcsc::ATRParser p;
     p.load(atr);
 
-    if (!p.checkFeature(xpcsc::ATR_FEATURE_PICC)
-        || !(p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K)
-            || p.checkFeature(xpcsc::ATR_FEATURE_INFINEON_SLE_66R35) )
-    ) {
-        std::cerr << "Not compatible card!" << std::endl;
+
+    // STAGE 3
+    // check is card compatible
+    if (!p.checkFeature(xpcsc::ATR_FEATURE_PICC)) {
+        error("Contactless card required!");
         return 1;
     }
 
-    // Mifare 1K-compatible card, read 16 sectors/64 blocks
-    // template for Load Keys command
-    unsigned char cmd_load_keys[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
-        0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+    if (!p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K) && 
+        !p.checkFeature(xpcsc::ATR_FEATURE_INFINEON_SLE_66R35)) 
+    {
+        error("Card type is not supported");
+        return 1;
+    }
 
-    // template for General Auth command
-    unsigned char cmd_general_auth[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
-        0x05, 0x01, 0x00, 0x00, 0x60, 0x00};
+    // STAGE 4
+    // read card contents
+    size_t total_blocks = 0;
 
-    // template for Read Binary command
-    unsigned char cmd_read_binary[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
-
-    xpcsc::Bytes command;
-    xpcsc::Bytes response;
-
-    CardContents card;
-
-    // walk through all sectors and try to read data
-    for (size_t sector = 0; sector < 16; sector++) {
-        Keys::const_iterator ps = keys.find(sector);
-
-        if (ps == keys.end()) {
-            error("Undefined sector keys: " << sector);
+    CardContents card(64);
+    if (p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K) ||
+        p.checkFeature(xpcsc::ATR_FEATURE_INFINEON_SLE_66R35)) 
+    {
+        if (!read_mifare_1k(c, keys, card)) {
+            error("Failed to read card contents");
             return 1;
         }
+        total_blocks = 64;
+    }
 
-        const SectorKeys & sector_keys = ps->second;
+    char buf[32];
+    for (size_t i=0; i<total_blocks; i++) {
+        const Block & block_data = card[i];
 
-        if (sector_keys.Key_A_set) {
-            
+        snprintf(buf, 31, "0x%02X", (unsigned int)block_data.sector);
+        std::cout << buf << "  ";
+        snprintf(buf, 31, "0x%02X", (unsigned int)i);
+        std::cout << buf << "  ";
+        if (block_data.key_type == KeyNone) {
+            std::cout << "?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ??";
+        } else {
+            std::cout << xpcsc::format(xpcsc::Bytes(block_data.data, 16));
         }
+
+        switch (block_data.key_type) {
+        case KeyA:
+            std::cout << "  Key: A " << keys[block_data.sector].key_A_str;
+            break;
+        case KeyB:
+            std::cout << "  Key: B " << keys[block_data.sector].key_B_str;
+            break;
+        default:
+            std::cout << "  Key: ?             ";
+        }
+
+        if (block_data.is_access_set) {
+            std::cout << "  Access: " << int(block_data.C1) 
+                << " " << int(block_data.C2) 
+                << " " << int(block_data.C3);
+        }
+
+        std::cout << std::endl;
     }
 
     return 0;
