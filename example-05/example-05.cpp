@@ -29,7 +29,7 @@
 #include <iostream>
 #include <sstream>
 
-#include <string.h>
+#include <cstring>
 #include <unistd.h>
 
 #define CHECK_BIT(value, b) (((value) >> (b))&1)
