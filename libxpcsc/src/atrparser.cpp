@@ -453,6 +453,7 @@ bool ATRParser::checkFeature(ATRFeature feature)
                         break;
                     case 0xff88:
                         p->features.insert(ATR_FEATURE_INFINEON_SLE_66R35);
+                        p->features.insert(ATR_FEATURE_MIFARE_4K);
                         break;
                     }
                 }
