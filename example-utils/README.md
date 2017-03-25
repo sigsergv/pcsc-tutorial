@@ -1,6 +1,11 @@
 Some simple demonstration utilities.
 
-mifare-dump
-===========
+dump-mifare-card
+================
 
-Dump Mifare storage card contents using known keys.
+Dump Mifare Classic 1K storage card contents using known keys.
+
+dump-atr
+========
+
+Parse and print ATR.

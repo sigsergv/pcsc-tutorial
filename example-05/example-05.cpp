@@ -84,13 +84,15 @@ int main(int argc, char **argv)
     xpcsc::ATRParser p;
     p.load(atr);
 
-    if (!p.checkFeature(xpcsc::ATR_FEATURE_PICC)
-        || !(p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K)
-            || p.checkFeature(xpcsc::ATR_FEATURE_INFINEON_SLE_66R35) )
-    ) {
-        std::cerr << "Not compatible card!" << std::endl;
+    if (!p.checkFeature(xpcsc::ATR_FEATURE_PICC)) {
+        std::cerr << "Contactless card required!" << std::endl;
         return 1;
     }
+
+if (!p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K)) {
+    std::cerr << "Contactless card required!" << std::endl;
+    return 1;
+}
 
     // template for Load Keys command
     unsigned char cmd_load_keys[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
@@ -104,13 +106,13 @@ int main(int argc, char **argv)
     unsigned char cmd_read_binary[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
 
     // standard keys
-    const size_t keys_number = 2;
+    const size_t keys_number = 3;
     unsigned char keys[keys_number][6] = {
         {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},  // NXP factory default key
-        {0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5}  // Infineon factory default key
+        {0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5},  // Infineon factory default key A
+        {0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5}  // Infineon factory default key B
         // {0xd3, 0xf7, 0xd3, 0xf7, 0xd3, 0xf7},
         // {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff},
-        // {0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5},
         // {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
     };
 

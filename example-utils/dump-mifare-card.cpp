@@ -523,9 +523,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (!p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K) && 
-        !p.checkFeature(xpcsc::ATR_FEATURE_INFINEON_SLE_66R35)) 
-    {
+    if (!p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K)) {
         error("Card type is not supported");
         return 1;
     }
