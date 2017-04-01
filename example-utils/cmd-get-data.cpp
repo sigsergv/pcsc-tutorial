@@ -26,7 +26,7 @@
  */
 
 /**
- * @file dump-atr.cpp
+ * @file cmd-get-data.cpp
  * @author Sergey Stolyarov <sergei@regolit.com>
  *
  * Scan card, Get Data command result,

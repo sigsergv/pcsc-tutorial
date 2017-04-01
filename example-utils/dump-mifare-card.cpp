@@ -26,7 +26,7 @@
  */
 
 /**
- * @file dump-atr.cpp
+ * @file dump-mifare-card.cpp
  * @author Sergey Stolyarov <sergei@regolit.com>
  *
  * Scan card using provided file with keys and print scanned
