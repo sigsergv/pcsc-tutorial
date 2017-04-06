@@ -1,4 +1,5 @@
 /dump-atr
 /dump-mifare-card
 /cmd-get-data
+/acr122u
 *.o
