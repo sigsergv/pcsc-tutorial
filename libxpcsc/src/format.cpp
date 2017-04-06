@@ -59,7 +59,7 @@ std::string format(Bytes b, FormatOptions fo)
     return ss.str();
 }
 
-std::string format(unsigned char c, FormatOptions fo)
+std::string format(Byte c, FormatOptions fo)
 {
     char cbuf[32];
     const char * fmt = format_strings[fo];

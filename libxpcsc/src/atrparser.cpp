@@ -65,10 +65,10 @@ struct ATRParser::Private
     Bytes atr;
 
     // common fields (like interface bytes)
-    std::map<ATRField, unsigned char> fields;
+    std::map<ATRField, Byte> fields;
 
     // historical bytes
-    unsigned char hb[15];
+    Byte hb[15];
     size_t hb_size;
     std::set<ATRFeature> features;
 };
@@ -110,8 +110,8 @@ void ATRParser::load(const Bytes & bytes)
     p->atr.assign(bytes);
     p->fields.clear();
 
-    unsigned char pos = 0;
-    unsigned char b;
+    Byte pos = 0;
+    Byte b;
 
     // byte: TS
     b = bytes.at(pos);
@@ -129,7 +129,7 @@ void ATRParser::load(const Bytes & bytes)
     p->hb_size = LN(b); 
 
     // read next sections
-    unsigned char TD_p = b;
+    Byte TD_p = b;
 
     // all section keys
     ATRField sections_TA[] = {ATRNONE, TA1, TA2, TA3, TA4, TA5, TA6, TA7};
@@ -216,8 +216,8 @@ std::string ATRParser::str() const
 
     std::stringstream ss;
     std::stringstream sd;
-    std::map<ATRField, unsigned char>::const_iterator end = p->fields.end();
-    unsigned char b;
+    std::map<ATRField, Byte>::const_iterator end = p->fields.end();
+    Byte b;
 
     PRINT_DEBUG("[D] Parsed fields: " << p->fields.size());
 
@@ -336,7 +336,7 @@ std::string ATRParser::str() const
                     Bytes RID = hb.substr(3, 5);
                     ss << "    RID=" << decodeRID(RID) << '\n';
 
-                    unsigned char SS = hb.at(8);
+                    Byte SS = hb.at(8);
                     switch (SS) {
                     case 03:
                         ss << "    SS=ISO/IEC 14443A, Part 3" << '\n';
@@ -358,8 +358,8 @@ std::string ATRParser::str() const
                         if (i >= max_i) {
                             break;
                         }
-                        unsigned char tag = HN(hb.at(i));
-                        unsigned char length = LN(hb.at(i));
+                        Byte tag = HN(hb.at(i));
+                        Byte length = LN(hb.at(i));
 
                         switch (tag) {
                         case 0x3:
@@ -402,7 +402,7 @@ std::string ATRParser::str() const
     if (p->fields.find(TCK) != end) {
         // found TCK, check 
         ss << "  TCK found: " << format(p->fields[TCK]);
-        unsigned char checksum = p->fields[TCK];
+        Byte checksum = p->fields[TCK];
 
         size_t max = p->atr.size() - 1;
         for (size_t i=1; i<max; i++) {
@@ -517,8 +517,8 @@ static std::string decodeRID(const Bytes & rid)
 static std::string decodeCardName(const Bytes & rid, const Bytes & card_name)
 {
     std::stringstream ss;
-    unsigned char c1 = card_name.at(1);
-    unsigned char c2 = card_name.at(0);
+    Byte c1 = card_name.at(1);
+    Byte c2 = card_name.at(0);
     int card = c2*256 + c1;
 
     if (format(rid).compare("A0 00 00 03 06") == 0) {

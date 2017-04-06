@@ -34,11 +34,11 @@
 
 namespace xpcsc {
 
-bool parse_access_bits(unsigned char b7, unsigned char b8, BlocksAccessBits * bits)
+bool parse_access_bits(Byte b7, Byte b8, BlocksAccessBits * bits)
 {
-    unsigned char C1;
-    unsigned char C2;
-    unsigned char C3;
+    Byte C1;
+    Byte C2;
+    Byte C3;
 
     C1 = CHECK_BIT(b7, 4);
     C2 = CHECK_BIT(b8, 0);

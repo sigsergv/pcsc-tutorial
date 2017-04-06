@@ -156,7 +156,7 @@ void Connection::transmit(const Bytes & command, Bytes * response)
 
     // PRINT_DEBUG("[D] Command length: " << send_buffer_size);
 
-    unsigned char *recv_buffer = new unsigned char[recv_buffer_size];
+    Byte *recv_buffer = new Byte[recv_buffer_size];
 
     // TODO: select protocol correctly
     try {
