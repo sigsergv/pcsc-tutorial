@@ -80,26 +80,26 @@ int main(int argc, char **argv)
     }
 
     // template for Load Keys command
-    unsigned char cmd_load_keys[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
+    const xpcsc::Byte CMD_LOAD_KEYS[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
         0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     // template for General Auth command
-    unsigned char cmd_general_auth[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
+    const xpcsc::Byte CMD_GENERAL_AUTH[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
         0x05, 0x01, 0x00, 0x00, 0x60, 0x00};
 
     // template for Read Binary command
-    unsigned char cmd_read_binary[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
+    const xpcsc::Byte CMD_READ_BINARY[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
 
     // template for Update Binary command
-    unsigned char cmd_update_binary[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_UPDATE_BINARY, 0x00, 0x00, 0x10,
+    unsigned char CMD_UPDATE_BINARY[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_UPDATE_BINARY, 0x00, 0x00, 0x10,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     xpcsc::Bytes command;
     xpcsc::Bytes response;
 
     // load ACTIVE_KEY_A
-    memcpy(cmd_load_keys+5, ACTIVE_KEY_A, 6);
-    command.assign(cmd_load_keys, sizeof(cmd_load_keys));
+    command.assign(CMD_LOAD_KEYS, sizeof(CMD_LOAD_KEYS));
+    command.replace(5, 6, ACTIVE_KEY_A, 6);
     c.transmit(command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Failed to load key" << std::endl;
@@ -107,9 +107,9 @@ int main(int argc, char **argv)
     }
 
     // authenticate to access block CARD_BLOCK using loaded key as Key A 
-    cmd_general_auth[7] = CARD_BLOCK;
-    cmd_general_auth[8] = 0x61;
-    command.assign(cmd_general_auth, sizeof(cmd_general_auth));
+    command.assign(CMD_GENERAL_AUTH, sizeof(CMD_GENERAL_AUTH));
+    command[7] = CARD_BLOCK;
+    command[8] = 0x60;
     c.transmit(command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Cannot authenticate using ACTIVE_KEY_A!" << std::endl;
@@ -120,9 +120,9 @@ int main(int argc, char **argv)
     xpcsc::Bytes balance_block(16, 0);
 
     // update block
-    cmd_update_binary[3] = CARD_BLOCK;
-    memcpy(cmd_update_binary+5, balance_block.c_str(), 16);
-    command.assign(cmd_update_binary, sizeof(cmd_update_binary));
+    command.assign(CMD_UPDATE_BINARY, sizeof(CMD_UPDATE_BINARY));
+    command[3] = CARD_BLOCK;
+    command.replace(5, 16, balance_block.c_str(), 16);
     c.transmit(command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Cannot update block!" << std::endl;
@@ -130,23 +130,23 @@ int main(int argc, char **argv)
     }
 
     // read sector trailer
-    cmd_read_binary[3] = CARD_SECTOR_TRAILER;
-    command.assign(cmd_read_binary, sizeof(cmd_read_binary));
+    command.assign(CMD_READ_BINARY, sizeof(CMD_READ_BINARY));
+    command[3] = CARD_SECTOR_TRAILER;
     c.transmit(command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Cannot read block!" << std::endl;
         return -1;
     }
 
-    // update trailer with a factory Key A
+    // update trailer with a factory Key A 
     xpcsc::Bytes trailer = response.substr(0, 16);
     trailer.replace(0, 6, DEFAULT_KEY_A, 6);
     trailer.replace(10, 6, DEFAULT_KEY_A, 6);
 
     // update sector trailer
-    cmd_update_binary[3] = CARD_SECTOR_TRAILER;
-    memcpy(cmd_update_binary+5, trailer.c_str(), 16);
-    command.assign(cmd_update_binary, sizeof(cmd_update_binary));
+    command.assign(CMD_UPDATE_BINARY, sizeof(CMD_UPDATE_BINARY));
+    command[3] = CARD_SECTOR_TRAILER;
+    command.replace(5, 16, trailer.c_str(), 16);
     c.transmit(command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Cannot update block!" << std::endl;

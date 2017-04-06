@@ -28,7 +28,7 @@
 #ifndef _H_8166de26ce11fa4506028027f468f4a4
 #define _H_8166de26ce11fa4506028027f468f4a4
 
-const unsigned char CARD_SECTOR  = 0x6;
+const unsigned char CARD_SECTOR  = 0x5;
 const unsigned char CARD_SECTOR_BLOCK = 0x2;
 const unsigned char CARD_BLOCK = ((CARD_SECTOR * 4) + CARD_SECTOR_BLOCK);
 const unsigned char CARD_SECTOR_TRAILER = ((CARD_SECTOR * 4) + 3);

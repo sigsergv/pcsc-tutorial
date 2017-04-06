@@ -80,22 +80,22 @@ int main(int argc, char **argv)
     }
 
     // template for Load Keys command
-    unsigned char cmd_load_keys[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
+    const xpcsc::Byte CMD_LOAD_KEYS[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
         0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     // template for General Auth command
-    unsigned char cmd_general_auth[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
+    const xpcsc::Byte CMD_GENERAL_AUTH[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
         0x05, 0x01, 0x00, 0x00, 0x60, 0x00};
 
     // template for Read Binary command
-    unsigned char cmd_read_binary[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
+    const xpcsc::Byte CMD_READ_BINARY[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
 
     xpcsc::Bytes command;
     xpcsc::Bytes response;
 
     // load ACTIVE_KEY_A
-    memcpy(cmd_load_keys+5, ACTIVE_KEY_A, 6);
-    command.assign(cmd_load_keys, sizeof(cmd_load_keys));
+    command.assign(CMD_LOAD_KEYS, sizeof(CMD_LOAD_KEYS));
+    command.replace(5, 6, ACTIVE_KEY_A, 6);
     c.transmit(command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Failed to load key" << std::endl;
@@ -103,9 +103,9 @@ int main(int argc, char **argv)
     }
 
     // authenticate to access block CARD_BLOCK using loaded key as Key A 
-    cmd_general_auth[7] = CARD_BLOCK;
-    cmd_general_auth[8] = 0x61;
-    command.assign(cmd_general_auth, sizeof(cmd_general_auth));
+    command.assign(CMD_GENERAL_AUTH, sizeof(CMD_GENERAL_AUTH));
+    command[7] = CARD_BLOCK;
+    command[8] = 0x60;
     c.transmit(command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Cannot authenticate using ACTIVE_KEY_A!" << std::endl;
@@ -113,8 +113,8 @@ int main(int argc, char **argv)
     }
 
     // read block CARD_BLOCK
-    cmd_read_binary[3] = CARD_BLOCK;
-    command.assign(cmd_read_binary, sizeof(cmd_read_binary));
+    command.assign(CMD_READ_BINARY, sizeof(CMD_READ_BINARY));
+    command[3] = CARD_BLOCK;
     c.transmit(command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Cannot read block!" << std::endl;
