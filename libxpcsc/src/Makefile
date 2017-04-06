@@ -17,7 +17,7 @@ all: libxpcsc.a
 clean:
 	rm -f *.a *.o
 
-libxpcsc.a: connection.o exceptions.o format.o atrparser.o
+libxpcsc.a: connection.o exceptions.o format.o access_bits.o atrparser.o
 	ar -rcs $@ $^
 
 %.o: %.cpp ../include/xpcsc.hpp
