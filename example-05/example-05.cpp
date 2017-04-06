@@ -36,13 +36,13 @@
 
 typedef enum {Key_None, Key_A, Key_B} CardBlockKeyType;
 struct AccessBits {
-    unsigned char C1 : 1, C2 : 1, C3 :1;
+    xpcsc::Byte C1 : 1, C2 : 1, C3 :1;
     bool is_set;
     AccessBits() : is_set(false) {};
 };
 struct CardContents {
-    unsigned char blocks_data[64][16];
-    unsigned char blocks_keys[64][6];
+    xpcsc::Byte blocks_data[64][16];
+    xpcsc::Byte blocks_keys[64][6];
 
     CardBlockKeyType blocks_key_types[64];
     AccessBits blocks_access_bits[64];
@@ -95,19 +95,19 @@ int main(int argc, char **argv)
     }
 
     // template for Load Keys command
-    unsigned char cmd_load_keys[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
+    const xpcsc::Byte CMD_LOAD_KEYS[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
         0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     // template for General Auth command
-    unsigned char cmd_general_auth[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
+    const xpcsc::Byte CMD_GENERAL_AUTH[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
         0x05, 0x01, 0x00, 0x00, 0x60, 0x00};
 
     // template for Read Binary command
-    unsigned char cmd_read_binary[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
+    const xpcsc::Byte CMD_READ_BINARY[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
 
     // standard keys
     const size_t keys_number = 3;
-    unsigned char keys[keys_number][6] = {
+    xpcsc::Byte keys[keys_number][6] = {
         {0xff, 0xff, 0xff, 0xff, 0xff, 0xff},  // NXP factory default key
         {0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5},  // Infineon factory default key A
         {0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5}  // Infineon factory default key B
@@ -135,7 +135,7 @@ int main(int argc, char **argv)
     s2 << "Blocks:  ";
     char buf[10];
 
-    for (unsigned char i=0; i<16; i++) {
+    for (xpcsc::Byte i = 0; i < 16; i++) {
         snprintf(buf, 6, "0x%01X   ", i);
         s1 << buf;
         s2 << "==== ";
@@ -147,7 +147,7 @@ int main(int argc, char **argv)
     // walk through all sectors and try to read data
     std::cout << "         ";
     for (size_t sector = 0; sector < 16; sector++) {
-        size_t first_block = sector * 4;
+        xpcsc::Byte first_block = sector * 4;
         size_t k;
 
         bool key_found = false;
@@ -156,8 +156,8 @@ int main(int argc, char **argv)
             // try to authenticate on first sector
 
             // first load key into a terminal 
-            memcpy(cmd_load_keys+5, keys[k], 6);
-            command.assign(cmd_load_keys, 11);
+            command.assign(CMD_LOAD_KEYS, sizeof(CMD_LOAD_KEYS));
+            command.replace(5, 6, keys[k], 6);
             c.transmit(command, &response);
             if (c.response_status(response) != 0x9000) {
                 // next key
@@ -167,16 +167,16 @@ int main(int argc, char **argv)
             // usleep(1700000);
 
             // authenticate as Key B
-            cmd_general_auth[7] = first_block;
-            cmd_general_auth[8] = 0x61;
-            command.assign(cmd_general_auth, 10);
+            command.assign(CMD_GENERAL_AUTH, sizeof(CMD_GENERAL_AUTH));
+            command[7] = first_block;
+            command[8] = 0x61;
             c.transmit(command, &response);
             if (c.response_status(response) == 0x9000) {
                 // success, try to read data from all blocks (for this sector only!):
                 for (size_t i=0; i<4; i++) {
-                    size_t block = first_block+i;
-                    cmd_read_binary[3] = block;
-                    command.assign(cmd_read_binary, 5);
+                    xpcsc::Byte block = first_block+i;
+                    command.assign(CMD_READ_BINARY, sizeof(CMD_READ_BINARY));
+                    command[3] = block;
                     c.transmit(command, &response);
                     if (c.response_status(response) != 0x9000) {
                         // failed to read block
@@ -194,16 +194,16 @@ int main(int argc, char **argv)
             // usleep(1700000);
 
             // authenticate as Key A
-            cmd_general_auth[7] = first_block;
-            cmd_general_auth[8] = 0x60;
-            command.assign(cmd_general_auth, 10);
+            command.assign(CMD_GENERAL_AUTH, sizeof(CMD_GENERAL_AUTH));
+            command[7] = first_block;
+            command[8] = 0x60;
             c.transmit(command, &response);
             if (c.response_status(response) == 0x9000) {
                 // success, try to read data from all blocks (for this sector only!):
                 for (size_t i=0; i<4; i++) {
-                    size_t block = first_block+i;
-                    cmd_read_binary[3] = block;
-                    command.assign(cmd_read_binary, 5);
+                    xpcsc::Byte block = first_block+i;
+                    command.assign(CMD_READ_BINARY, sizeof(CMD_READ_BINARY));
+                    command[3] = block;
                     c.transmit(command, &response);
                     if (c.response_status(response) != 0x9000) {
                         // failed to read block
@@ -226,10 +226,10 @@ int main(int argc, char **argv)
             std::cout << "++++ " << std::flush;        
             // read access bits
             size_t block = sector * 4 + 3;
-            const unsigned char *sector_trailer = card.blocks_data[block];
+            const xpcsc::Byte *sector_trailer = card.blocks_data[block];
 
-            unsigned char b7 = sector_trailer[7];
-            unsigned char b8 = sector_trailer[8];
+            xpcsc::Byte b7 = sector_trailer[7];
+            xpcsc::Byte b8 = sector_trailer[8];
 
             card.blocks_access_bits[block-3].is_set = true;
             card.blocks_access_bits[block-3].C1 = CHECK_BIT(b7, 4);
@@ -268,7 +268,7 @@ int main(int argc, char **argv)
     // print card contents
     xpcsc::Bytes key;
     for (size_t i=0; i<64; i++) {
-        std::cout << "0x" << xpcsc::format((unsigned char)i) << " | ";
+        std::cout << "0x" << xpcsc::format((xpcsc::Byte)i) << " | ";
 
         xpcsc::Bytes row(card.blocks_data[i], 16);
         if (card.blocks_key_types[i] == Key_None) {
