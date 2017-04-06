@@ -89,10 +89,10 @@ int main(int argc, char **argv)
         return 1;
     }
 
-if (!p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K)) {
-    std::cerr << "Contactless card required!" << std::endl;
-    return 1;
-}
+    if (!p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K)) {
+        std::cerr << "Mifare card required!" << std::endl;
+        return 1;
+    }
 
     // template for Load Keys command
     unsigned char cmd_load_keys[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
