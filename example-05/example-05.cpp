@@ -67,17 +67,19 @@ int main(int argc, char **argv)
     }
 
     // connect to reader
+    xpcsc::Reader reader;
+
     try {
-        std::string reader = *readers.begin();
-        std::cout << "Found reader: " << reader << std::endl;
-        c.wait_for_card(reader);
+        std::string reader_name = *readers.begin();
+        std::cout << "Found reader: " << reader_name << std::endl;
+        reader = c.wait_for_reader_card(reader_name);
     } catch (xpcsc::PCSCError &e) {
         std::cerr << "Wait for card failed: " << e.what() << std::endl;
         return 1;
     }
 
     // fetch and print ATR
-    xpcsc::Bytes atr = c.atr();
+    xpcsc::Bytes atr = c.atr(reader);
     std::cout << "ATR: " << xpcsc::format(atr) << std::endl;
 
     // parse ATR
@@ -158,7 +160,7 @@ int main(int argc, char **argv)
             // first load key into a terminal 
             command.assign(CMD_LOAD_KEYS, sizeof(CMD_LOAD_KEYS));
             command.replace(5, 6, keys[k], 6);
-            c.transmit(command, &response);
+            c.transmit(reader, command, &response);
             if (c.response_status(response) != 0x9000) {
                 // next key
                 continue;
@@ -170,14 +172,14 @@ int main(int argc, char **argv)
             command.assign(CMD_GENERAL_AUTH, sizeof(CMD_GENERAL_AUTH));
             command[7] = first_block;
             command[8] = 0x61;
-            c.transmit(command, &response);
+            c.transmit(reader, command, &response);
             if (c.response_status(response) == 0x9000) {
                 // success, try to read data from all blocks (for this sector only!):
                 for (size_t i=0; i<4; i++) {
                     xpcsc::Byte block = first_block+i;
                     command.assign(CMD_READ_BINARY, sizeof(CMD_READ_BINARY));
                     command[3] = block;
-                    c.transmit(command, &response);
+                    c.transmit(reader, command, &response);
                     if (c.response_status(response) != 0x9000) {
                         // failed to read block
                         // std::cerr << "[Failed read] Key B " << block << ", key: " << str_keys[k] << std::endl;
@@ -197,14 +199,14 @@ int main(int argc, char **argv)
             command.assign(CMD_GENERAL_AUTH, sizeof(CMD_GENERAL_AUTH));
             command[7] = first_block;
             command[8] = 0x60;
-            c.transmit(command, &response);
+            c.transmit(reader, command, &response);
             if (c.response_status(response) == 0x9000) {
                 // success, try to read data from all blocks (for this sector only!):
                 for (size_t i=0; i<4; i++) {
                     xpcsc::Byte block = first_block+i;
                     command.assign(CMD_READ_BINARY, sizeof(CMD_READ_BINARY));
                     command[3] = block;
-                    c.transmit(command, &response);
+                    c.transmit(reader, command, &response);
                     if (c.response_status(response) != 0x9000) {
                         // failed to read block
                         // std::cerr << "[Failed read] Key A " << block << ", key: " << str_keys[k] << std::endl;

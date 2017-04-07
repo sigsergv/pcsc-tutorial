@@ -52,101 +52,98 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // connect to reader
+    std::string reader_name = *readers.begin();
+
     try {
-        std::string reader = *readers.begin();
-        std::cout << "Found reader: " << reader << std::endl;
-        c.wait_for_card(reader);
-    } catch (xpcsc::PCSCError &e) {
-        std::cerr << "Wait for card failed: " << e.what() << std::endl;
-        return 1;
-    }
+        while (1) {
+            std::cout << "Terminal is ready, use your card!" << std::endl;
+            // assuming there is a card in reader, use it
+            xpcsc::Reader reader = c.wait_for_reader_card(reader_name);
+            xpcsc::Bytes atr = c.atr(reader);
 
-    // fetch and print ATR
-    xpcsc::Bytes atr = c.atr();
+            // parse ATR
+            xpcsc::ATRParser p;
+            p.load(atr);
 
-    // parse ATR
-    xpcsc::ATRParser p;
-    p.load(atr);
+            if (!p.checkFeature(xpcsc::ATR_FEATURE_PICC)) {
+                std::cerr << "Contactless card required!" << std::endl;
+                c.wait_for_card_remove(reader_name);
+                continue;
+            }
 
-    if (!p.checkFeature(xpcsc::ATR_FEATURE_PICC)) {
-        std::cerr << "Contactless card required!" << std::endl;
-        return 1;
-    }
+            if (!p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K)) {
+                std::cerr << "Mifare card required!" << std::endl;
+                c.wait_for_card_remove(reader_name);
+                continue;
+            }
 
-    if (!p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K)) {
-        std::cerr << "Mifare card required!" << std::endl;
-        return 1;
-    }
+            xpcsc::Bytes command;
+            xpcsc::Bytes response;
 
-    // template for Load Keys command
-    const xpcsc::Byte CMD_LOAD_KEYS[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
-        0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+            // load ACTIVE_KEY_A
+            command.assign(CMD_LOAD_KEYS, sizeof(CMD_LOAD_KEYS));
+            command.replace(5, 6, ACTIVE_KEY_A, 6);
+            c.transmit(reader, command, &response);
+            if (c.response_status(response) != 0x9000) {
+                std::cerr << "Failed to load key" << std::endl;
+                c.wait_for_card_remove(reader_name);
+                continue;
+            }
 
-    // template for General Auth command
-    const xpcsc::Byte CMD_GENERAL_AUTH[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
-        0x05, 0x01, 0x00, 0x00, 0x60, 0x00};
+            // authenticate to access block CARD_BLOCK using loaded key as Key A 
+            command.assign(CMD_GENERAL_AUTH, sizeof(CMD_GENERAL_AUTH));
+            command[7] = CARD_BLOCK;
+            command[8] = 0x60;
+            c.transmit(reader, command, &response);
+            if (c.response_status(response) != 0x9000) {
+                std::cerr << "Cannot authenticate using ACTIVE_KEY_A!" << std::endl;
+                c.wait_for_card_remove(reader_name);
+                continue;
+            }
 
-    // template for Read Binary command
-    const xpcsc::Byte CMD_READ_BINARY[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
+            // read block CARD_BLOCK
+            command.assign(CMD_READ_BINARY, sizeof(CMD_READ_BINARY));
+            command[3] = CARD_BLOCK;
+            c.transmit(reader, command, &response);
+            if (c.response_status(response) != 0x9000) {
+                std::cerr << "Cannot read block!" << std::endl;
+                c.wait_for_card_remove(reader_name);
+                continue;
+            }
 
-    // template for Update Binary command
-    unsigned char CMD_UPDATE_BINARY[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_UPDATE_BINARY, 0x00, 0x00, 0x10,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+            // and read balance
+            uint16_t balance = 0;
+            memcpy(&balance, response.c_str(), 2);
 
-    xpcsc::Bytes command;
-    xpcsc::Bytes response;
+            if (balance < TICKET_PRICE) {
+                std::cout << "Not enough money on card!" << std::endl;
+            } else {
+                // update balance
+                balance -= TICKET_PRICE;
+                xpcsc::Bytes balance_block(16, 0);
+                balance_block.replace(0, 2, (unsigned char *)&balance, 2);
 
-    // load ACTIVE_KEY_A
-    command.assign(CMD_LOAD_KEYS, sizeof(CMD_LOAD_KEYS));
-    command.replace(5, 6, ACTIVE_KEY_A, 6);
-    c.transmit(command, &response);
-    if (c.response_status(response) != 0x9000) {
-        std::cerr << "Failed to load key" << std::endl;
-        return 1;
-    }
+                // update block
+                command.assign(CMD_UPDATE_BINARY, sizeof(CMD_UPDATE_BINARY));
+                command[3] = CARD_BLOCK;
+                command.replace(5, 16, balance_block.c_str(), 16);
+                c.transmit(reader, command, &response);
+                if (c.response_status(response) != 0x9000) {
+                    std::cerr << "Cannot update block!" << std::endl;
+                    c.wait_for_card_remove(reader_name);
+                    continue;
+                }
+            }
+            std::cout << "Card balance is: " << balance << std::endl;
 
-    // authenticate to access block CARD_BLOCK using loaded key as Key A 
-    command.assign(CMD_GENERAL_AUTH, sizeof(CMD_GENERAL_AUTH));
-    command[7] = CARD_BLOCK;
-    command[8] = 0x60;
-    c.transmit(command, &response);
-    if (c.response_status(response) != 0x9000) {
-        std::cerr << "Cannot authenticate using ACTIVE_KEY_A!" << std::endl;
-        return -1;
-    }
-
-    // read block CARD_BLOCK
-    command.assign(CMD_READ_BINARY, sizeof(CMD_READ_BINARY));
-    command[3] = CARD_BLOCK;
-    c.transmit(command, &response);
-    if (c.response_status(response) != 0x9000) {
-        std::cerr << "Cannot read block!" << std::endl;
-        return -1;
-    }
-
-    // and read balance
-    unsigned short balance = 0;
-    memcpy(&balance, response.c_str(), 2);
-
-    if (balance < TICKET_PRICE) {
-        std::cout << "Not enough money on card!" << std::endl;
-    } else {
-        // update balance
-        balance -= TICKET_PRICE;
-        xpcsc::Bytes balance_block(16, 0);
-        balance_block.replace(0, 2, (unsigned char *)&balance, 2);
-
-        // update block
-        command.assign(CMD_UPDATE_BINARY, sizeof(CMD_UPDATE_BINARY));
-        command[3] = CARD_BLOCK;
-        command.replace(5, 16, balance_block.c_str(), 16);
-        c.transmit(command, &response);
-        if (c.response_status(response) != 0x9000) {
-            std::cerr << "Cannot update block!" << std::endl;
-            return -1;
+            c.wait_for_card_remove(reader_name);
         }
+    } catch (xpcsc::PCSCError &e) {
+        std::cerr << "PC/SC operation failed: " << e.what() << std::endl;
+        return 1;
     }
 
-    std::cout << "Card balance is: " << balance << std::endl;
-}
+
+        
+
+        }

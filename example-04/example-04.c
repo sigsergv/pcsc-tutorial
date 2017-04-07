@@ -76,10 +76,10 @@ int main(int argc, char **argv)
     }
 
     // take first reader, 256-bytes buffer should be enough
-    char reader[256] = {0};
+    char reader_name[256] = {0};
 
     if (readers_size > 1) {
-        strncpy(reader, readers, 255);
+        strncpy(reader_name, readers, 255);
     } else {
         printf("No readers found!\n");
         return 2;
@@ -87,11 +87,11 @@ int main(int argc, char **argv)
 
     free(readers);
 
-    printf("Use reader '%s'\n", reader);
+    printf("Use reader '%s'\n", reader_name);
 
     // connect to reader and wait for card
     SCARD_READERSTATE sc_reader_states[1];
-    sc_reader_states[0].szReader = reader;
+    sc_reader_states[0].szReader = reader_name;
     sc_reader_states[0].dwCurrentState = SCARD_STATE_EMPTY;
 
     result = SCardGetStatusChange(sc_context, INFINITE, sc_reader_states, 1);
@@ -102,12 +102,12 @@ int main(int argc, char **argv)
     }
 
     // connect to inserted card
-    SCARDHANDLE card;
+    SCARDHANDLE reader;
     DWORD active_protocol;
 
-    result = SCardConnect(sc_context, reader, 
+    result = SCardConnect(sc_context, reader_name, 
         SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1,
-        &card, &active_protocol);
+        &reader, &active_protocol);
     if (result != SCARD_S_SUCCESS) {
         SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
@@ -148,11 +148,11 @@ int main(int argc, char **argv)
     // \xff\xff\xff\xff\xff\xff
     DWORD recv_length = recv_buffer_size;
 
-    result = SCardTransmit(card, SCARD_PCI_T1, 
+    result = SCardTransmit(reader, SCARD_PCI_T1, 
         send_buffer, send_buffer_size, NULL,
         recv_buffer, &recv_length);
     if (result != SCARD_S_SUCCESS) {
-        SCardDisconnect(card, SCARD_RESET_CARD);
+        SCardDisconnect(reader, SCARD_RESET_CARD);
         SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
@@ -166,7 +166,7 @@ int main(int argc, char **argv)
         printf("Failed to set keys\n");
         printf("Response APDU: ");
         print_bytes(recv_buffer, recv_length);
-        SCardDisconnect(card, SCARD_RESET_CARD);
+        SCardDisconnect(reader, SCARD_RESET_CARD);
         SCardReleaseContext(sc_context);
         return 1;
     }
@@ -189,11 +189,11 @@ int main(int argc, char **argv)
     //                  CLA    INS    P1     P2     Lc     Command bytes
     memcpy(send_buffer, "\xff" "\x86" "\x00" "\x00" "\x05" "\x01\x00\x00\x60\x00", send_buffer_size);
 
-    result = SCardTransmit(card, SCARD_PCI_T1, 
+    result = SCardTransmit(reader, SCARD_PCI_T1, 
         send_buffer, send_buffer_size, NULL,
         recv_buffer, &recv_length);
     if (result != SCARD_S_SUCCESS) {
-        SCardDisconnect(card, SCARD_RESET_CARD);
+        SCardDisconnect(reader, SCARD_RESET_CARD);
         SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
@@ -207,7 +207,7 @@ int main(int argc, char **argv)
         printf("Failed to auth\n");
         printf("Response APDU: ");
         print_bytes(recv_buffer, recv_length);
-        SCardDisconnect(card, SCARD_RESET_CARD);
+        SCardDisconnect(reader, SCARD_RESET_CARD);
         SCardReleaseContext(sc_context);
         return 1;
     }
@@ -224,11 +224,11 @@ int main(int argc, char **argv)
     //                  CLA    INS    P1     P2     Le
     memcpy(send_buffer, "\xff" "\xb0" "\x00" "\x01" "\x10", send_buffer_size);
 
-    result = SCardTransmit(card, SCARD_PCI_T1, 
+    result = SCardTransmit(reader, SCARD_PCI_T1, 
         send_buffer, send_buffer_size, NULL,
         recv_buffer, &recv_length);
     if (result != SCARD_S_SUCCESS) {
-        SCardDisconnect(card, SCARD_RESET_CARD);
+        SCardDisconnect(reader, SCARD_RESET_CARD);
         SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
@@ -242,7 +242,7 @@ int main(int argc, char **argv)
         printf("Failed to fetch block\n");
         printf("Response APDU: ");
         print_bytes(recv_buffer, recv_length);
-        SCardDisconnect(card, SCARD_RESET_CARD);
+        SCardDisconnect(reader, SCARD_RESET_CARD);
         SCardReleaseContext(sc_context);
         return 1;
     }
@@ -251,7 +251,7 @@ int main(int argc, char **argv)
     print_bytes(recv_buffer, recv_length-2);
 
     // disconnect from card
-    result = SCardDisconnect(card, SCARD_RESET_CARD);
+    result = SCardDisconnect(reader, SCARD_RESET_CARD);
     if (result != SCARD_S_SUCCESS) {
         SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));

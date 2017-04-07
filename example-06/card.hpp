@@ -25,17 +25,34 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <xpcsc.hpp>
+
 #ifndef _H_8166de26ce11fa4506028027f468f4a4
 #define _H_8166de26ce11fa4506028027f468f4a4
 
-const unsigned char CARD_SECTOR  = 0x5;
-const unsigned char CARD_SECTOR_BLOCK = 0x2;
-const unsigned char CARD_BLOCK = ((CARD_SECTOR * 4) + CARD_SECTOR_BLOCK);
-const unsigned char CARD_SECTOR_TRAILER = ((CARD_SECTOR * 4) + 3);
-const unsigned char DEFAULT_KEY_A[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-const unsigned char ACTIVE_KEY_A[6] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
-const unsigned short INITIAL_BALANCE = 15000;
-const unsigned short TICKET_PRICE = 170;
+const uint8_t CARD_SECTOR  = 0x5;
+const uint8_t CARD_SECTOR_BLOCK = 0x2;
+const uint8_t CARD_BLOCK = ((CARD_SECTOR * 4) + CARD_SECTOR_BLOCK);
+const uint8_t CARD_SECTOR_TRAILER = ((CARD_SECTOR * 4) + 3);
+const uint8_t DEFAULT_KEY_A[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+const uint8_t ACTIVE_KEY_A[6] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+const uint16_t INITIAL_BALANCE = 15000;
+const uint16_t TICKET_PRICE = 170;
+
+// template for Load Keys command
+const xpcsc::Byte CMD_LOAD_KEYS[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
+    0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+// template for General Auth command
+const xpcsc::Byte CMD_GENERAL_AUTH[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
+    0x05, 0x01, 0x00, 0x00, 0x60, 0x00};
+
+// template for Read Binary command
+const xpcsc::Byte CMD_READ_BINARY[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
+
+// template for Update Binary command
+unsigned char CMD_UPDATE_BINARY[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_UPDATE_BINARY, 0x00, 0x00, 0x10,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 #define CHECK_BIT(value, b) (((value) >> (b))&1)
 

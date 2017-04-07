@@ -53,17 +53,18 @@ int main(int argc, char **argv)
     }
 
     // connect to reader
+    xpcsc::Reader reader;
     try {
-        std::string reader = *readers.begin();
-        std::cout << "Found reader: " << reader << std::endl;
-        c.wait_for_card(reader);
+        std::string reader_name = *readers.begin();
+        std::cout << "Found reader: " << reader_name << std::endl;
+        reader = c.wait_for_reader_card(reader_name);
     } catch (xpcsc::PCSCError &e) {
         std::cerr << "Wait for card failed: " << e.what() << std::endl;
         return 1;
     }
 
     // fetch and print ATR
-    xpcsc::Bytes atr = c.atr();
+    xpcsc::Bytes atr = c.atr(reader);
 
     // parse ATR
     xpcsc::ATRParser p;
@@ -79,28 +80,13 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // template for Load Keys command
-    const xpcsc::Byte CMD_LOAD_KEYS[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
-        0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-    // template for General Auth command
-    const xpcsc::Byte CMD_GENERAL_AUTH[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
-        0x05, 0x01, 0x00, 0x00, 0x60, 0x00};
-
-    // template for Read Binary command
-    const xpcsc::Byte CMD_READ_BINARY[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
-
-    // template for Update Binary command
-    xpcsc::Byte CMD_UPDATE_BINARY[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_UPDATE_BINARY, 0x00, 0x00, 0x10,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
     xpcsc::Bytes command;
     xpcsc::Bytes response;
 
     // load DEFAULT_KEY_A
     command.assign(CMD_LOAD_KEYS, sizeof(CMD_LOAD_KEYS));
     command.replace(5, 6, DEFAULT_KEY_A, 6);
-    c.transmit(command, &response);
+    c.transmit(reader, command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Failed to load key" << std::endl;
         return 1;
@@ -110,30 +96,30 @@ int main(int argc, char **argv)
     command.assign(CMD_GENERAL_AUTH, sizeof(CMD_GENERAL_AUTH));
     command[7] = CARD_BLOCK;
     command[8] = 0x60;
-    c.transmit(command, &response);
+    c.transmit(reader, command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Cannot authenticate using DEFAULT_KEY_A!" << std::endl;
-        return -1;
+        return 1;
     }
 
     // read block CARD_BLOCK and check it contains only zeroes
     command.assign(CMD_READ_BINARY, sizeof(CMD_READ_BINARY));
     command[3] = CARD_BLOCK;
-    c.transmit(command, &response);
+    c.transmit(reader, command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Cannot read block!" << std::endl;
-        return -1;
+        return 1;
     }
 
     for (size_t i=0; i < 15; i++) {
         if (response.at(i) != 0) {
             std::cerr << "Block must be filled with zeroes!" << std::endl;
-            return -1;
+            return 1;
         }
     }
 
     // initial balance
-    unsigned short balance = INITIAL_BALANCE;
+    uint16_t balance = INITIAL_BALANCE;
 
     // create block with balance, change first 2 bytes
     xpcsc::Bytes balance_block(16, 0);
@@ -143,19 +129,19 @@ int main(int argc, char **argv)
     command.assign(CMD_UPDATE_BINARY, sizeof(CMD_UPDATE_BINARY));
     command[3] = CARD_BLOCK;
     command.replace(5, 16, balance_block.c_str(), 16);
-    c.transmit(command, &response);
+    c.transmit(reader, command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Cannot update block!" << std::endl;
-        return -1;
+        return 1;
     }
 
     // read sector trailer
     command.assign(CMD_READ_BINARY, sizeof(CMD_READ_BINARY));
     command[3] = CARD_SECTOR_TRAILER;
-    c.transmit(command, &response);
+    c.transmit(reader, command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Cannot read block!" << std::endl;
-        return -1;
+        return 1;
     }
 
     // update trailer with a new Key A
@@ -167,11 +153,11 @@ int main(int argc, char **argv)
     command.assign(CMD_UPDATE_BINARY, sizeof(CMD_UPDATE_BINARY));
     command[3] = CARD_SECTOR_TRAILER;
     command.replace(5, 16, trailer.c_str(), 16);
-    c.transmit(command, &response);
+    c.transmit(reader, command, &response);
     if (c.response_status(response) != 0x9000) {
         std::cerr << "Cannot update block!" << std::endl;
-        return -1;
+        return 1;
     }
 
-    std::cout << "Success!" << std::endl;
+    std::cout << "Card activated!" << std::endl;
 }

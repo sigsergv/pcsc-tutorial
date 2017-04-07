@@ -76,10 +76,10 @@ int main(int argc, char **argv)
     }
 
     // take first reader, 256-bytes buffer should be enough
-    char reader[256] = {0};
+    char reader_name[256] = {0};
 
     if (readers_size > 1) {
-        strncpy(reader, readers, 255);
+        strncpy(reader_name, readers, 255);
     } else {
         printf("No readers found!\n");
         return 2;
@@ -87,11 +87,11 @@ int main(int argc, char **argv)
 
     free(readers);
 
-    printf("Use reader '%s'\n", reader);
+    printf("Use reader '%s'\n", reader_name);
 
     // connect to reader and wait for card
     SCARD_READERSTATE sc_reader_states[1];
-    sc_reader_states[0].szReader = reader;
+    sc_reader_states[0].szReader = reader_name;
     sc_reader_states[0].dwCurrentState = SCARD_STATE_EMPTY;
 
     result = SCardGetStatusChange(sc_context, INFINITE, sc_reader_states, 1);
@@ -101,16 +101,16 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // connect to inserted card
-    SCARDHANDLE card;
+    // connect to the reader with inserted card
+    SCARDHANDLE reader;
     DWORD active_protocol;
 
-    result = SCardConnect(sc_context, reader, 
+    result = SCardConnect(sc_context, reader_name, 
         SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1,
-        &card, &active_protocol);
+        &reader, &active_protocol);
     if (result != SCARD_S_SUCCESS) {
         SCardReleaseContext(sc_context);
-        printf("%s\n", pcsc_stringify_error(result));
+        printf("sss%s\n", pcsc_stringify_error(result));
         return 1;
     }
 
@@ -129,10 +129,10 @@ int main(int argc, char **argv)
     DWORD atr_size = MAX_ATR_SIZE;
     BYTE atr[MAX_ATR_SIZE];
 
-    result = SCardStatus(card, reader_friendly_name, &reader_friendly_name_size, 
+    result = SCardStatus(reader, reader_friendly_name, &reader_friendly_name_size, 
         &state, &protocol, atr, &atr_size);
     if (result != SCARD_S_SUCCESS) {
-        SCardDisconnect(card, SCARD_RESET_CARD);
+        SCardDisconnect(reader, SCARD_RESET_CARD);
         SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
         return 1;
@@ -141,8 +141,8 @@ int main(int argc, char **argv)
     printf("  Card ATR: ");
     print_bytes(atr, atr_size);
 
-    // disconnect from card
-    result = SCardDisconnect(card, SCARD_RESET_CARD);
+    // disconnect from the reader
+    result = SCardDisconnect(reader, SCARD_RESET_CARD);
     if (result != SCARD_S_SUCCESS) {
         SCardReleaseContext(sc_context);
         printf("%s\n", pcsc_stringify_error(result));
