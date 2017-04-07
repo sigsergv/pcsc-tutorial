@@ -32,11 +32,24 @@
 #include <vector>
 #include <string>
 
+#ifdef __APPLE__
+#include <PCSC/pcsclite.h>
+#include <PCSC/winscard.h>
+#include <PCSC/wintypes.h>
+#else
+#include <pcsclite.h>
+#include <winscard.h>
+#include <wintypes.h>
+#endif
+
+#define PCSC_CALL(f) do {long _result = (f);  handle_pcsc_response_code(_result); } while (0)
+
 namespace xpcsc {
 
 typedef uint8_t Byte;
 typedef std::basic_string<Byte> Bytes;
 typedef std::vector<std::string> Strings;
+typedef SCARDHANDLE Reader;
 
 // some useful constants
 // CLA
@@ -92,11 +105,15 @@ public:
 
     Strings readers();
 
-    void wait_for_card(const std::string & reader);
+    Reader wait_for_reader_card(const std::string & reader_name);
 
-    Bytes atr();
+    void wait_for_card_remove(const std::string & reader_name);
 
-    void transmit(const Bytes & command, Bytes * response = 0);
+    void disconnect_card(Reader reader, DWORD disposition = SCARD_RESET_CARD);
+
+    Bytes atr(Reader reader);
+
+    void transmit(Reader reader, const Bytes & command, Bytes * response = 0);
 
     static int response_status(const Bytes & response);
     static std::string response_status_str(const Bytes & response);
@@ -108,9 +125,8 @@ private:
 
     void handle_pcsc_response_code(long response);
     void release_context();
-    void release_card_handle();
+    // void release_card_handle();
 };
-
 
 class ATRParseError : public std::runtime_error {
 public:
