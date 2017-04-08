@@ -57,10 +57,11 @@ int main(int argc, char **argv)
     }
 
     // connect to reader
+    xpcsc::Reader reader = 0;
     try {
-        std::string reader = *readers.begin();
-        std::cout << "Found reader: " << reader << std::endl;
-        c.wait_for_card(reader);
+        std::string reader_name = *readers.begin();
+        std::cout << "Found reader: " << reader_name << std::endl;
+        reader = c.wait_for_reader_card(reader_name);
     } catch (xpcsc::PCSCError &e) {
         std::cerr << "Wait for card failed: " << e.what() << std::endl;
         return 1;
@@ -83,6 +84,6 @@ int main(int argc, char **argv)
     std::cout << "Send cmd_1" << std::endl;
 
     command.assign(cmd_1, sizeof(cmd_1));
-    c.transmit(command, &response);
+    c.transmit(reader, command, &response);
     std::cout << "Response: " << xpcsc::format(response) << std::endl;
 }

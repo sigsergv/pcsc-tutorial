@@ -57,17 +57,18 @@ int main(int argc, char **argv)
     }
 
     // connect to reader
+    xpcsc::Reader reader = 0;
     try {
-        std::string reader = *readers.begin();
-        std::cout << "Found reader: " << reader << std::endl;
-        c.wait_for_card(reader);
+        std::string reader_name = *readers.begin();
+        std::cout << "Found reader: " << reader_name << std::endl;
+        reader = c.wait_for_reader_card(reader_name);
     } catch (xpcsc::PCSCError &e) {
         std::cerr << "Wait for card failed: " << e.what() << std::endl;
         return 1;
     }
 
     // fetch and print ATR
-    xpcsc::Bytes atr = c.atr();
+    xpcsc::Bytes atr = c.atr(reader);
     std::cout << "ATR: " << xpcsc::format(atr) << std::endl;
 
     // parse ATR

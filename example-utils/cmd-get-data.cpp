@@ -60,17 +60,18 @@ int main(int argc, char **argv)
     }
 
     // connect to reader
+    xpcsc::Reader reader = 0;
     try {
-        std::string reader = *readers.begin();
-        std::cout << "Found reader: " << reader << std::endl;
-        c.wait_for_card(reader);
+        std::string reader_name = *readers.begin();
+        std::cout << "Found reader: " << reader_name << std::endl;
+        reader = c.wait_for_reader_card(reader_name);
     } catch (xpcsc::PCSCError &e) {
         std::cerr << "Wait for card failed: " << e.what() << std::endl;
         return 1;
     }
 
     // fetch and print ATR
-    xpcsc::Bytes atr = c.atr();
+    xpcsc::Bytes atr = c.atr(reader);
     std::cout << "ATR: " << xpcsc::format(atr) << std::endl;
 
     // parse ATR
@@ -85,10 +86,10 @@ int main(int argc, char **argv)
     xpcsc::Bytes command;
     xpcsc::Bytes response;
 
-    unsigned char cmd[] = {xpcsc::CLA_PICC, xpcsc::INS_PICC_GET_DATA, 0x0, 0x0, 0x0};
+    xpcsc::Byte cmd[] = {xpcsc::CLA_PICC, xpcsc::INS_PICC_GET_DATA, 0x0, 0x0, 0x0};
 
-    command.assign(cmd, 5);
-    c.transmit(command, &response);
+    command.assign(cmd, sizeof(cmd));
+    c.transmit(reader, command, &response);
     if (c.response_status(response) != 0x9000) {
         error("Cannot read card data");
         return -2;
@@ -97,10 +98,8 @@ int main(int argc, char **argv)
     xpcsc::Bytes uid = c.response_data(response);
     std::cout << "UID: " << xpcsc::format(uid) << std::endl;
 
-    cmd[2] = 0x1;
-
-    command.assign(cmd, 5);
-    c.transmit(command, &response);
+    command[2] = 0x1;
+    c.transmit(reader, command, &response);
     int sw = c.response_status(response);
 
     if (sw == 0x6a81) {

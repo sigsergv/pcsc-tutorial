@@ -27,7 +27,7 @@ $(SIMPLE_BINARIES): %: %.o
 	g++ -g -o $@ $@.o  $(CPPFLAGS) $(LDFLAGS) 
 
 clean:
-	rm -f $(BINARY) $(OBJS)
+	rm -f $(SIMPLE_BINARIES) *.o
 
 %.o: %.cpp
 	g++ -Wall -c -o $@ $< $(CPPFLAGS)
