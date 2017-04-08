@@ -56,9 +56,10 @@ int main(int argc, char **argv)
 
     try {
         while (1) {
+            c.wait_for_card_remove(reader_name);
             std::cout << "Terminal is ready, use your card!" << std::endl;
-            // assuming there is a card in reader, use it
             xpcsc::Reader reader = c.wait_for_reader_card(reader_name);
+
             xpcsc::Bytes atr = c.atr(reader);
 
             // parse ATR
@@ -67,13 +68,11 @@ int main(int argc, char **argv)
 
             if (!p.checkFeature(xpcsc::ATR_FEATURE_PICC)) {
                 std::cerr << "Contactless card required!" << std::endl;
-                c.wait_for_card_remove(reader_name);
                 continue;
             }
 
             if (!p.checkFeature(xpcsc::ATR_FEATURE_MIFARE_1K)) {
                 std::cerr << "Mifare card required!" << std::endl;
-                c.wait_for_card_remove(reader_name);
                 continue;
             }
 
@@ -86,7 +85,6 @@ int main(int argc, char **argv)
             c.transmit(reader, command, &response);
             if (c.response_status(response) != 0x9000) {
                 std::cerr << "Failed to load key" << std::endl;
-                c.wait_for_card_remove(reader_name);
                 continue;
             }
 
@@ -97,7 +95,6 @@ int main(int argc, char **argv)
             c.transmit(reader, command, &response);
             if (c.response_status(response) != 0x9000) {
                 std::cerr << "Cannot authenticate using ACTIVE_KEY_A!" << std::endl;
-                c.wait_for_card_remove(reader_name);
                 continue;
             }
 
@@ -107,7 +104,6 @@ int main(int argc, char **argv)
             c.transmit(reader, command, &response);
             if (c.response_status(response) != 0x9000) {
                 std::cerr << "Cannot read block!" << std::endl;
-                c.wait_for_card_remove(reader_name);
                 continue;
             }
 
@@ -116,7 +112,7 @@ int main(int argc, char **argv)
             memcpy(&balance, response.c_str(), 2);
 
             if (balance < TICKET_PRICE) {
-                std::cout << "Not enough money on card!" << std::endl;
+                std::cout << "Not enough money on the card!" << std::endl;
             } else {
                 // update balance
                 balance -= TICKET_PRICE;
@@ -135,15 +131,10 @@ int main(int argc, char **argv)
                 }
             }
             std::cout << "Card balance is: " << balance << std::endl;
-
-            c.wait_for_card_remove(reader_name);
         }
     } catch (xpcsc::PCSCError &e) {
         std::cerr << "PC/SC operation failed: " << e.what() << std::endl;
         return 1;
     }
 
-
-        
-
-        }
+}
