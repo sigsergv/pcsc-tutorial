@@ -254,8 +254,11 @@ std::string ATRParser::str() const
             ss << ", protocol T=0";
             break;
         }
-        ss << '\n';
+    } else {
+        // see ISO 7816-3, section "8.2.3 Interface bytes TA TB TC TD"
+        ss << "  TD1 is absent, protocol T=0 assumed";
     }
+    ss << '\n';
 
     float f_max[] = {4, 5, 6, 8, 12, 16, 20, -1, -1, 5, 7.5, 10, 15, 20, 0, 0};
     int fi[] = {372, 372, 558, 744, 1116, 1488, 1860, -1, -1, 512, 768, 1024,   1536,   2048, -1, -1};

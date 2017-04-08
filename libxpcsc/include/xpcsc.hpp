@@ -105,7 +105,7 @@ public:
 
     Strings readers();
 
-    Reader wait_for_reader_card(const std::string & reader_name);
+    Reader wait_for_reader_card(const std::string & reader_name, DWORD preferred_protocols = SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1);
 
     void wait_for_card_remove(const std::string & reader_name);
 

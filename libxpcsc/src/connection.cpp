@@ -99,7 +99,7 @@ Strings Connection::readers()
     return r;
 }
 
-SCARDHANDLE Connection::wait_for_reader_card(const std::string & reader_name)
+SCARDHANDLE Connection::wait_for_reader_card(const std::string & reader_name, DWORD preferred_protocols)
 {
     CONTEXT_READY_CHECK();
 
@@ -130,7 +130,7 @@ SCARDHANDLE Connection::wait_for_reader_card(const std::string & reader_name)
     SCARDHANDLE reader;
 
     PCSC_CALL( SCardConnect(p->context, reader_name.c_str(), 
-        SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1,
+        SCARD_SHARE_SHARED, preferred_protocols,
         &(reader), &active_protocol) );
 
     return reader;
