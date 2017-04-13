@@ -57,7 +57,7 @@ int main(int argc, char **argv)
     try {
         std::string reader_name = *readers.begin();
         std::cout << "Found reader: " << reader_name << std::endl;
-        reader = c.wait_for_reader_card(reader_name);
+        reader = c.wait_for_reader_card(reader_name, SCARD_PROTOCOL_T0);
     } catch (xpcsc::PCSCError &e) {
         std::cerr << "Wait for card failed: " << e.what() << std::endl;
         return 1;

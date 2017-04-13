@@ -99,8 +99,10 @@ Strings Connection::readers()
     return r;
 }
 
-SCARDHANDLE Connection::wait_for_reader_card(const std::string & reader_name, DWORD preferred_protocols)
+xpcsc::Reader Connection::wait_for_reader_card(const std::string & reader_name, DWORD preferred_protocols)
 {
+    xpcsc::Reader reader;
+
     CONTEXT_READY_CHECK();
 
     SCARD_READERSTATE sc_reader_states[1];
@@ -127,17 +129,24 @@ SCARDHANDLE Connection::wait_for_reader_card(const std::string & reader_name, DW
     }
 
     DWORD active_protocol;
-    SCARDHANDLE reader;
 
     PCSC_CALL( SCardConnect(p->context, reader_name.c_str(), 
         SCARD_SHARE_SHARED, preferred_protocols,
-        &(reader), &active_protocol) );
+        &(reader.handle), &active_protocol) );
+
+    if (active_protocol == SCARD_PROTOCOL_T0) {
+        reader.send_pci = SCARD_PCI_T0;
+    } else if (active_protocol == SCARD_PROTOCOL_T1) {
+        reader.send_pci = SCARD_PCI_T1;
+    } else {
+        throw ConnectionError("Not supported protocol!");
+    }
 
     return reader;
 }
 
 
-void Connection::disconnect_card(SCARDHANDLE reader, DWORD disposition)
+void Connection::disconnect_card(const xpcsc::Reader & reader, DWORD disposition)
 {
     // all possible values for disposition:
     //   SCARD_LEAVE_CARD  - do nothing
@@ -147,11 +156,11 @@ void Connection::disconnect_card(SCARDHANDLE reader, DWORD disposition)
 
     // don't need to check for card
 
-    PCSC_CALL(SCardDisconnect(reader, disposition));
+    PCSC_CALL(SCardDisconnect(reader.handle, disposition));
 }
 
 
-Bytes Connection::atr(SCARDHANDLE reader)
+Bytes Connection::atr(const xpcsc::Reader & reader)
 {
     DWORD state;
     char reader_friendly_name[MAX_READERNAME];
@@ -160,7 +169,7 @@ Bytes Connection::atr(SCARDHANDLE reader)
     DWORD atr_size = MAX_ATR_SIZE;
     BYTE atr[MAX_ATR_SIZE];
 
-    PCSC_CALL(SCardStatus(reader, reader_friendly_name, &reader_friendly_name_size, 
+    PCSC_CALL(SCardStatus(reader.handle, reader_friendly_name, &reader_friendly_name_size, 
         &state, &protocol, atr, &atr_size));
 
     Bytes b(atr, atr_size);
@@ -168,7 +177,7 @@ Bytes Connection::atr(SCARDHANDLE reader)
 }
 
 
-void Connection::transmit(SCARDHANDLE reader, const Bytes & command, Bytes * response)
+void Connection::transmit(const xpcsc::Reader & reader, const Bytes & command, Bytes * response)
 {
     const LONG recv_buffer_size = 1024;
     LONG send_buffer_size = command.length();
@@ -180,7 +189,7 @@ void Connection::transmit(SCARDHANDLE reader, const Bytes & command, Bytes * res
 
     // TODO: select protocol correctly
     try {
-        PCSC_CALL( SCardTransmit(reader, SCARD_PCI_T1, 
+        PCSC_CALL( SCardTransmit(reader.handle, reader.send_pci, 
             command.data(), send_buffer_size, NULL,
             recv_buffer, &recv_length) );
     } catch (PCSCError &e) {

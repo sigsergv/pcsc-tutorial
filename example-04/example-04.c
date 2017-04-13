@@ -106,7 +106,7 @@ int main(int argc, char **argv)
     DWORD active_protocol;
 
     result = SCardConnect(sc_context, reader_name, 
-        SCARD_SHARE_SHARED, SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1,
+        SCARD_SHARE_SHARED, SCARD_PROTOCOL_T1,
         &reader, &active_protocol);
     if (result != SCARD_S_SUCCESS) {
         SCardReleaseContext(sc_context);

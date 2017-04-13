@@ -49,7 +49,11 @@ namespace xpcsc {
 typedef uint8_t Byte;
 typedef std::basic_string<Byte> Bytes;
 typedef std::vector<std::string> Strings;
-typedef SCARDHANDLE Reader;
+
+struct Reader {
+    SCARDHANDLE handle;
+    SCARD_IO_REQUEST *send_pci;
+};
 
 // some useful constants
 // CLA
@@ -109,11 +113,11 @@ public:
 
     void wait_for_card_remove(const std::string & reader_name);
 
-    void disconnect_card(Reader reader, DWORD disposition = SCARD_RESET_CARD);
+    void disconnect_card(const Reader & reader, DWORD disposition = SCARD_RESET_CARD);
 
-    Bytes atr(Reader reader);
+    Bytes atr(const Reader & reader);
 
-    void transmit(Reader reader, const Bytes & command, Bytes * response = 0);
+    void transmit(const Reader & reader, const Bytes & command, Bytes * response = 0);
 
     static int response_status(const Bytes & response);
     static std::string response_status_str(const Bytes & response);
