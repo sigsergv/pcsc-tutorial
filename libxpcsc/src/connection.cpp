@@ -28,6 +28,7 @@
 #include <stdexcept>
 #include <string>
 #include <iostream>
+#include <cstring>
 
 #include "../include/xpcsc.hpp"
 #include "debug.hpp"
@@ -182,16 +183,58 @@ void Connection::transmit(const xpcsc::Reader & reader, const Bytes & command, B
     const LONG recv_buffer_size = 1024;
     LONG send_buffer_size = command.length();
     DWORD recv_length = recv_buffer_size;
+    Bytes collector;
 
     // PRINT_DEBUG("[D] Command length: " << send_buffer_size);
 
     Byte *recv_buffer = new Byte[recv_buffer_size];
 
-    // TODO: select protocol correctly
     try {
         PCSC_CALL( SCardTransmit(reader.handle, reader.send_pci, 
             command.data(), send_buffer_size, NULL,
             recv_buffer, &recv_length) );
+
+        // analyze response status, if it's 61XX then more data available
+        if (recv_length < 2) {
+            throw ConnectionError("Invalid response (length<2)");
+        }
+
+        if (recv_buffer[recv_length-2] == 0x61) {
+            // more data available (only for T=0)
+            collector.assign(recv_buffer, recv_length - 2);
+            xpcsc::Byte cmd_get_response[] = {0x00, INS_GET_RESPONSE, 0x00, 0x00, 0x00};
+
+            do {
+                // read next portion
+                uint8_t size = recv_buffer[recv_length - 1];
+                cmd_get_response[4] = size;
+
+                recv_length = recv_buffer_size;
+                PCSC_CALL( SCardTransmit(reader.handle, reader.send_pci, 
+                    cmd_get_response, 5, NULL,
+                    recv_buffer, &recv_length) );
+
+                if (recv_length < 2) {
+                    throw ConnectionError("Invalid response (length<2)");
+                }
+
+                if (recv_buffer[recv_length-2] == 0x61) {
+                    // append data and continue
+                    collector.append(recv_buffer, recv_length-2);
+                    continue;
+                }
+                if (recv_buffer[recv_length-2] == 0x90 && recv_buffer[recv_length-1] == 0x00) {
+                    // finished
+                    collector.append(recv_buffer, recv_length);
+                    break;
+                }
+                // something happened, return just status code
+                collector.assign(recv_buffer, recv_length);
+                break;
+            } while (1);
+        } else {
+            collector.assign(recv_buffer, recv_length);
+        }
     } catch (PCSCError &e) {
         delete[] recv_buffer;
         throw e;
@@ -200,7 +243,7 @@ void Connection::transmit(const xpcsc::Reader & reader, const Bytes & command, B
     delete[] recv_buffer;
 
     if (response != 0) {
-        response->assign(recv_buffer, recv_length);
+        response->assign(collector);
     }
 }
 
@@ -258,11 +301,11 @@ void Connection::wait_for_card_remove(const std::string & reader_name)
 
 
 
-int Connection::response_status(const Bytes & response)
+uint16_t Connection::response_status(const Bytes & response)
 {
     size_t size = response.size();
     if (size < 2) {
-        return -1;
+        return 0xffff;
     }
 
     return response.at(size-2)*256 + response.at(size-1);
@@ -270,12 +313,80 @@ int Connection::response_status(const Bytes & response)
 
 std::string Connection::response_status_str(const Bytes & response)
 {
-    size_t size = response.size();
-    if (size < 2) {
-        return "";
+    uint16_t status = response_status(response);
+
+    if (status == 0xffff) {
+        return "!No response!";
     }
 
-    return format(response.substr(size-2, 2));
+    std::string status_str;
+
+    switch (status) {
+    case 0x9000:
+        status_str = "Success";
+        break;
+
+    // warnings
+    case 0x6A00:
+        status_str = "SW1=6A, No information given";
+        break;
+
+    case 0x6A80:
+        status_str = "Incorrect parameters in the command data field";
+        break;
+
+    case 0x6A81:
+        status_str = "Function not supported";
+        break;
+
+    case 0x6A82:
+        status_str = "File or application not found";
+        break;
+
+    case 0x6A83:
+        status_str = "Record not found";
+        break;
+
+    case 0x6A84:
+        status_str = "Not enough memory space in the file";
+        break;
+
+    case 0x6A85:
+        status_str = "Nc inconsistent with TLV structure";
+        break;
+
+    case 0x6A86:
+        status_str = "Incorrect parameters P1-P2";
+        break;
+
+    case 0x6A87:
+        status_str = "Nc inconsistent with parameters P1-P2";
+        break;
+
+    case 0x6A88:
+        status_str = "Referenced data or reference data not found (exact meaning depending on the command)";
+        break;
+
+    case 0x6A89:
+        status_str = "File already exists";
+        break;
+
+    case 0x6A8A:
+        status_str = "DF name already exists";
+        break;
+
+    // errors
+    case 0x6700:
+        status_str = "Wrong length; no further indication";
+        break;
+
+    default:
+        char buf[32];
+        snprintf(buf, 31, "0x%04X", (uint16_t)status);
+        status_str = buf;
+    }
+
+    return status_str;
 }
 
 

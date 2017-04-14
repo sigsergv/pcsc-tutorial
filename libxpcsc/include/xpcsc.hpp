@@ -62,9 +62,12 @@ const Byte CLA_PICC = 0xff;
 // INS
 const Byte INS_MIFARE_LOAD_KEYS = 0x82;
 const Byte INS_MIFARE_GENERAL_AUTH = 0x86;
-const Byte INS_MIFARE_READ_BINARY = 0xb0;
-const Byte INS_MIFARE_UPDATE_BINARY = 0xd6;
+const Byte INS_MIFARE_READ_BINARY = 0xB0;
+const Byte INS_MIFARE_UPDATE_BINARY = 0xD6;
 const Byte INS_PICC_GET_DATA = 0xca;
+
+const Byte INS_SELECT = 0xA4;
+const Byte INS_GET_RESPONSE = 0xC0;
 
 // ATR features constants
 typedef enum { 
@@ -119,7 +122,7 @@ public:
 
     void transmit(const Reader & reader, const Bytes & command, Bytes * response = 0);
 
-    static int response_status(const Bytes & response);
+    static uint16_t response_status(const Bytes & response);
     static std::string response_status_str(const Bytes & response);
     static Bytes response_data(const Bytes & response);
 
