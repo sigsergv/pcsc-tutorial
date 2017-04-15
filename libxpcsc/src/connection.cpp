@@ -207,6 +207,9 @@ void Connection::transmit(const xpcsc::Reader & reader, const Bytes & command, B
             do {
                 // read next portion
                 uint8_t size = recv_buffer[recv_length - 1];
+                if (size == 0) {
+                    size = 256;
+                }
                 cmd_get_response[4] = size;
 
                 recv_length = recv_buffer_size;
