@@ -64,4 +64,12 @@ ATRParseError::ATRParseError(const char * what)
     : std::runtime_error(what)
 {}
 
+APDUParseError::APDUParseError(const char * what)
+    : std::runtime_error(what)
+{}
+
+BERTLVParseError::BERTLVParseError(const char * what)
+    : std::runtime_error(what)
+{}
+
 }

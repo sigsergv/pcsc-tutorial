@@ -25,73 +25,67 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <string>
 #include <sstream>
+#include <iostream>
+
+#include <cctype>
 
 #include "../include/xpcsc.hpp"
 
 namespace xpcsc {
 
-const char *format_strings[] = {"%02X", "0x%02x", "\\x%02X"};
-const char *sep_strings[] = {" ", ", ", ""};
-
-std::string format(const Bytes & b, FormatOptions fo)
+Byte char2byte(const char & c, bool & ok)
 {
-    char cbuf[32];
-    const char * fmt = format_strings[fo];
-    const std::string sep = std::string(sep_strings[fo]);
+    ok = true;
 
-    Bytes::const_iterator i = b.begin();
-    Bytes::const_iterator end = b.end();
-    std::stringstream ss;
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    }
+    if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    }
 
-    while (1) {
-        if (i == end) {
-            break;
+    ok = false;
+    return 0;
+}
+
+Bytes parse_apdu(const std::string & apdu)
+{
+    Byte bs[apdu.size()];
+    uint16_t length = 0;
+
+
+    bool ok;
+    Byte b1;
+    Byte b2;
+
+    std::string::const_iterator i;
+    for (i=apdu.begin(); i!=apdu.end(); i++) {
+        char c = tolower(*i);
+        if (c == ' ') {
+            continue;
         }
-        snprintf(cbuf, 31, fmt, *i);
-        ss << cbuf;
+        b1 = char2byte(c, ok);
+        if (!ok) {
+            throw APDUParseError("Incorrect character");
+        }
         i++;
-        if (i != end) {
-            ss << sep;
+        if (i==apdu.end()) {
+            throw APDUParseError("Unexpected input end");
         }
+
+        c = tolower(*i);
+        b2 = char2byte(c, ok);
+        if (!ok) {
+            throw APDUParseError("Incorrect character");
+        }
+
+        bs[length] = (Byte)(b1*16 + b2);
+        length++;
     }
 
-    return ss.str();
-}
-
-std::string format(const Byte & c, FormatOptions fo)
-{
-    char cbuf[32];
-    const char * fmt = format_strings[fo];
-
-    snprintf(cbuf, 31, fmt, c);
-    return cbuf;
-}
-
-std::string format(const BerTlv & tlv, FormatOptions fo, uint8_t indent_level)
-{
-    std::stringstream ss;
-    std::string indent(2*indent_level, ' ');
-    const Bytes & tag = tlv.get_tag();
-       
-    if (tag.size() != 0) {
-        ss << indent << "Tag: " << format(tlv.get_tag(), fo) << "\n";
-    }
-    if (tlv.is_raw()) {
-        ss << indent << "Data: " << format(tlv.get_data(), fo) << "\n";
-    }
-    const BerTlvList & items = tlv.get_children();
-    BerTlvList::const_iterator i;
-
-    for (i=items.begin(); i!=items.end(); i++) {
-        ss << format(*(*i), fo, indent_level+1);
-    }
-    return ss.str();
-}
-
-std::string format(const BerTlv & tlv, FormatOptions fo)
-{
-    return format(tlv, fo, 0);
+    return Bytes(bs, length);
 }
 
 }

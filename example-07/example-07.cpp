@@ -32,10 +32,15 @@
 #include <cstring>
 #include <unistd.h>
 
-
 int main(int argc, char **argv)
 {
     xpcsc::Connection c;
+
+    // xpcsc::Bytes test = xpcsc::parse_apdu("6F 15 84 0E 31 50 41 59 2E 53 59 53 2E 44 44 46 30 31 A5 03 88 01 01");
+    // std::cout << "TEST DATA: " << xpcsc::format(test) << std::endl;
+    // xpcsc::BerTlvRef t(xpcsc::BerTlv::parse(test));
+    // std::cout << "PRINT" << std::endl;
+    // return 123;
 
     try {
         c.init();
@@ -63,51 +68,63 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // fetch and print ATR
-    // xpcsc::Bytes atr = c.atr(reader);
-    // std::cout << "ATR: " << xpcsc::format(atr) << std::endl;
-    // // parse ATR
-    // xpcsc::ATRParser p;
-    // p.load(atr);
-    // std::cout << p.str() << std::endl;
 
     xpcsc::Bytes command;
     xpcsc::Bytes response;
     uint16_t response_status;
 
-    // SELECT MF (master file)
-
-    // xpcsc::Byte select_MF[] = {0x00, xpcsc::INS_SELECT, 0x00, 0x00,
-    //     0x02, 0x3F, 0x00,
-    //     0x00};
-
-    // Visa card
-    // P1=0x04 - Select by DF name
-    // P2=0x00 - First or only occurrence, Return FCI template
-    const xpcsc::Byte SELECT_APPLICATION[] = {0x00, xpcsc::INS_SELECT, 0x04, 0x00, 
-        0x07, 0xA0, 0x00, 0x00, 0x00, 0x03, 0x10, 0x10};
-
-    command.assign(SELECT_APPLICATION, sizeof(SELECT_APPLICATION));
+    command.assign(xpcsc::parse_apdu("00 A4 04 00   0E  31 50 41 59 2E 53 59 53 2E 44 44 46 30 31"));
     c.transmit(reader, command, &response);
     response_status = c.response_status(response);
 
-    std::cout << "RESPONSE: " << xpcsc::format(response) << std::endl;
-    // if ((response_status & 0x6100) == 0x6100) {
-    //     // process completed, need to fetch data
-    //     uint8_t size = response_status & 0xFF;
+    const xpcsc::Bytes TAG_EMV_FCI(xpcsc::parse_apdu("6F"));
+    const xpcsc::Bytes TAG_EMV_FCI_PR(xpcsc::parse_apdu("A5"));
+    const xpcsc::Bytes TAG_EMV_FCI_SFI(xpcsc::parse_apdu("88"));
+    const xpcsc::Bytes TAG_EMV_FCI_LANG(xpcsc::parse_apdu("5F 2D"));
+    const xpcsc::Bytes TAG_EMV_FCI_ISSUER(xpcsc::parse_apdu("9F 11"));
+    const xpcsc::Bytes TAG_EMV_FCI_ISSUER_DD(xpcsc::parse_apdu("BF 0C"));
 
-    //     command.assign(CMD_GET_RESPONSE, sizeof(CMD_GET_RESPONSE));
-    //     command[4] = size;
-    //     c.transmit(reader, command, &response);
-    //     response_status = c.response_status(response);
-                
-    //     std::cout << "RESPONSE: " << xpcsc::format(response) << std::endl;
-    // }
 
-    // if (response_status != 0x9000) {
-    //     std::cerr << "[E] " << c.response_status_str(response) << std::endl;
-    //     return 1;
-    // }
+    if (response_status == 0x9000) {
+        // parse response data
+        xpcsc::BerTlvRef tlv(xpcsc::BerTlv::parse(response.substr(0, response.size()-2)));
+
+        // std::cout << xpcsc::format(*tlv) << std::endl;
+
+        const xpcsc::BerTlvList & items = tlv->get_children();
+        if (items.size() > 0 && items[0]->get_tag().compare(TAG_EMV_FCI)==0) {
+            // FCI
+            const xpcsc::BerTlvRef & p = items[0];
+
+            // find A5 block
+            const xpcsc::BerTlvRef & A5_block = p->find_by_tag(TAG_EMV_FCI_PR);
+            if (A5_block) {
+                // fetch SFI
+                const xpcsc::BerTlvRef & SFI_block = A5_block->find_by_tag(TAG_EMV_FCI_SFI);
+                if (SFI_block) {
+                    const xpcsc::Bytes & data = SFI_block->get_data();
+                }
+
+                // const xpcsc::BerTlvRef & LANG_block = A5_block->find_by_tag(TAG_EMV_FCI_LANG);
+                // if (LANG_block) {
+                //     xpcsc::Bytes data = LANG_block->get_data();
+                //     std::stringstream ss;
+                //     for (xpcsc::Bytes::const_iterator i=data.begin(); i!=data.end(); i++) {
+                //         ss << static_cast<char>(*i);
+                //     }
+                //     std::cout << "Lang pref: " << ss.str() << std::endl;
+                // }
+
+                // const xpcsc::BerTlvRef & ISSUER_block = A5_block->find_by_tag(TAG_EMV_FCI_ISSUER);
+                // if (ISSUER_block) {
+                //     const xpcsc::Bytes & data = ISSUER_block->get_data();
+                //     std::cout << "Issuer: " << xpcsc::format(data) << std::endl;
+                // }
+            }
+        }
+        // std::cout << "RESPONSE STATUS: " << c.response_status_str(response) << std::endl;
+        // std::cout << "RESPONSE: " << xpcsc::format(response) << std::endl;
+    }
 
     return 0;
 }

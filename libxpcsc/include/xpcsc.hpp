@@ -31,6 +31,7 @@
 #include <stdexcept>
 #include <vector>
 #include <string>
+#include <memory>
 
 #ifdef __APPLE__
 #include <PCSC/pcsclite.h>
@@ -49,6 +50,7 @@ namespace xpcsc {
 typedef uint8_t Byte;
 typedef std::basic_string<Byte> Bytes;
 typedef std::vector<std::string> Strings;
+typedef std::unique_ptr<Bytes> UPBytes;
 
 struct Reader {
     SCARDHANDLE handle;
@@ -159,7 +161,6 @@ private:
 };
 
 
-// formatting functions for bytes
 typedef enum { 
     FormatHex = 0,  // HEX, like "01 ef 4d"
     FormatC,    // C, like "0x01 0xef 0x4d"
@@ -168,10 +169,53 @@ typedef enum {
 
 typedef Byte BlocksAccessBits[4];
 
-std::string format(Bytes, FormatOptions fo = FormatHex);
-std::string format(Byte, FormatOptions fo = FormatHex);
+class APDUParseError : public std::runtime_error {
+public:
+    APDUParseError(const char * what);
+};
+
+Bytes parse_apdu(const std::string & apdu);
 
 bool parse_access_bits(Byte b7, Byte b8, BlocksAccessBits * bits);
+
+
+// BER-TLV
+class BERTLVParseError : public std::runtime_error {
+public:
+    BERTLVParseError(const char * what);
+};
+
+class BerTlv;
+typedef std::shared_ptr<BerTlv> BerTlvRef;
+typedef std::vector<BerTlvRef> BerTlvList;
+
+typedef BerTlv * PBerTlv;
+
+class BerTlv {
+public:
+    static PBerTlv parse(const Bytes & data);
+    ~BerTlv();
+
+    const BerTlvList & get_children() const;
+    const Bytes & get_tag() const;
+    const Bytes & get_data() const;
+    bool is_raw() const;
+    const BerTlvRef find_by_tag(const Bytes & tag) const;
+
+private:
+    BerTlv(const Bytes & tag, const Bytes & data);
+
+    Bytes tag;
+    Bytes data;
+    bool raw;
+    BerTlvList children;
+};
+
+
+std::string format(const Bytes &, FormatOptions fo = FormatHex);
+std::string format(const Byte &, FormatOptions fo = FormatHex);
+std::string format(const BerTlv &, FormatOptions fo = FormatHex);
+
 }
 
 #endif
