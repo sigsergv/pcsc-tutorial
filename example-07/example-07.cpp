@@ -39,6 +39,8 @@ const xpcsc::Bytes TAG_EMV_FCI_SFI = {0x88};
 const xpcsc::Bytes TAG_PSD_REC = {0x70};
 const xpcsc::Bytes TAG_PSD_TAG = {0x61};
 const xpcsc::Bytes TAG_PSD_AID_TAG = {0x4F};
+const xpcsc::Bytes TAG_EMV_FCI_APP_LABEL = {0x50};
+const xpcsc::Bytes TAG_EMV_FCI_APP_PDOL = {0x9F, 0x38};
 
 std::vector<xpcsc::Bytes> read_apps_from_pse(xpcsc::Connection & c, xpcsc::Reader & reader)
 {
@@ -153,6 +155,86 @@ std::vector<xpcsc::Bytes> read_apps_from_pse(xpcsc::Connection & c, xpcsc::Reade
     return apps;
 }
 
+void read_app(xpcsc::Connection & c, xpcsc::Reader & reader, const xpcsc::Bytes & aid)
+{
+    xpcsc::Bytes command;
+    xpcsc::Bytes response;
+    uint16_t response_status;
+
+    // SELECT Payment System Environment (PSE)
+    //                                CLA INS P1 P2 
+    command.assign(xpcsc::parse_apdu("00  A4  04 00"));
+    command.push_back(static_cast<xpcsc::Byte>(aid.size()));
+    command.append(aid);
+
+    c.transmit(reader, command, &response);
+    response_status = c.response_status(response);
+
+    if (response_status == 0x6A82) {
+        // no application on the card
+        return ;
+    }
+
+    if (response_status != 0x9000) {
+        std::cerr << "Failed to fetch ADF: " << c.response_status_str(response) << std::endl;
+        return;
+    }
+
+    // parse response data
+    auto tlv = xpcsc::BerTlv::parse(response.substr(0, response.size()-2));
+
+    const auto & items = tlv->get_children();
+    if (items.size() == 0) {
+        // no data
+        return;
+    }
+
+    const auto & fci = items[0];
+
+    if (fci->get_tag().compare(TAG_EMV_FCI) != 0) {
+        // returned data is not a proper FCI
+        return;
+    }
+
+    // find proprietary data (PD) block
+    const auto & PD_block = fci->find_by_tag(TAG_EMV_FCI_PD);
+    if (!PD_block) {
+        // proprietary data block not found
+        return;
+    }
+
+    // std::cout << "PD block: \n" << xpcsc::format(*PD_block) << std::endl;
+
+    const auto & label_block = PD_block->find_by_tag(TAG_EMV_FCI_APP_LABEL);
+    if (label_block) {
+        // print application name in ASCII
+        std::cout << "Application label: " << label_block->get_data().c_str() << std::endl;
+    }
+
+    // setup GET PROCESSING OPTIONS command
+    // SELECT Payment System Environment (PSE)
+    //                                CLA INS P1 P2 
+    command.assign(xpcsc::parse_apdu("80  A8  00 00"));
+
+    const auto & PDOL_block = PD_block->find_by_tag(TAG_EMV_FCI_APP_PDOL);
+    if (PDOL_block) {
+        // std::cout << "Application label: " << label_block->get_data().c_str() << std::endl;
+    } else {
+        xpcsc::Bytes data = {0x02, 0x83, 0x00};
+        command.append(data);
+    }
+    // std::cout << "PDOL: " << xpcsc::format(PDOL_block->get_data()) << std::endl;
+
+    // Append Le
+    command.push_back(0x00);
+    c.transmit(reader, command, &response);
+    // response_status = c.response_status(response);
+
+    std::cout << xpcsc::format(response) << std::endl;
+
+}
+
+
 int main(int argc, char **argv)
 {
     xpcsc::Connection c;
@@ -193,6 +275,8 @@ int main(int argc, char **argv)
     auto aid = *(apps.begin());
 
     std::cout << "Found AID: " << xpcsc::format(aid) << std::endl;
+
+    read_app(c, reader, aid);
 
     return 0;
 }
