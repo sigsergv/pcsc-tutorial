@@ -32,15 +32,129 @@
 #include <cstring>
 #include <unistd.h>
 
+
+const xpcsc::Bytes TAG_EMV_FCI = {0x6F};
+const xpcsc::Bytes TAG_EMV_FCI_PD = {0xA5};
+const xpcsc::Bytes TAG_EMV_FCI_SFI = {0x88};
+const xpcsc::Bytes TAG_PSD_REC = {0x70};
+const xpcsc::Bytes TAG_PSD_TAG = {0x61};
+const xpcsc::Bytes TAG_PSD_AID_TAG = {0x4F};
+
+std::vector<xpcsc::Bytes> read_apps_from_pse(xpcsc::Connection & c, xpcsc::Reader & reader)
+{
+    xpcsc::Bytes command;
+    xpcsc::Bytes response;
+    uint16_t response_status;
+
+    std::vector<xpcsc::Bytes> apps;
+
+    // SELECT Payment System Environment (PSE)
+    //                                CLA INS P1 P2   Lc  "1PAY.SYS.DDF01"
+    command.assign(xpcsc::parse_apdu("00  A4  04 00   0E  31 50 41 59 2E 53 59 53 2E 44 44 46 30 31"));
+    c.transmit(reader, command, &response);
+    response_status = c.response_status(response);
+
+    if (response_status == 0x6A82) {
+        // no PSE on the card
+        return apps;
+    }
+
+    if (response_status != 0x9000) {
+        std::cerr << "Failed to fetch PSE: " << c.response_status_str(response) << std::endl;
+        return apps;
+    }
+
+    // parse response data
+    auto tlv = xpcsc::BerTlv::parse(response.substr(0, response.size()-2));
+
+    const auto & items = tlv->get_children();
+    if (items.size() == 0) {
+        // no data
+        return apps;
+    }
+
+    const auto & fci = items[0];
+
+    if (fci->get_tag().compare(TAG_EMV_FCI) != 0) {
+        // returned data is not a proper FCI
+        return apps;
+    }
+
+    // find proprietary data (PD) block
+    const auto & PD_block = fci->find_by_tag(TAG_EMV_FCI_PD);
+    if (!PD_block) {
+        // proprietary data block not found
+        return apps;
+    }
+
+    // find SFI block
+    const auto & SFI_block = PD_block->find_by_tag(TAG_EMV_FCI_SFI);
+    if (!SFI_block) {
+        // SFI data block not found
+        return apps;
+    }
+
+    xpcsc::Byte sfi = SFI_block->get_data()[0];
+    xpcsc::Byte P2 = (sfi << 3) | 4;
+
+    // read Payment System Directory
+    command = {0x00, 0xB2, 0x00, P2, 0x00};
+
+    for (xpcsc::Byte i=1; i<=10; i++) {
+        command[2] = i;
+        command[4] = 0;
+        c.transmit(reader, command, &response);
+        response_status = c.response_status(response);
+
+        if (response_status == 0x6A83) {
+            // no more records
+            break;
+        }
+
+        if ((response_status >> 8) == 0x6C) {
+            // repeat with proper Le
+            command[4] = static_cast<xpcsc::Byte>(response_status & 0xFF);
+            c.transmit(reader, command, &response);
+            response_status = c.response_status(response);
+        }
+
+        if (response_status != 0x9000) {
+            // something wrong
+            std::cerr << "Failed to fetch Payment System Directory record: " << c.response_status_str(response) << std::endl;
+            break;
+        }
+
+        auto atlv(xpcsc::BerTlv::parse(response.substr(0, response.size()-2)));
+
+        const auto & PSD_REC_block = atlv->find_by_tag(TAG_PSD_REC);
+        if (!PSD_REC_block) {
+            // malformed PSD record
+            return apps;
+        }
+
+        // find all AID records, they all have tag 61
+        const auto & psd_items =  PSD_REC_block->get_children();
+        for (auto j=psd_items.begin(); j!=psd_items.end(); j++) {
+            const xpcsc::BerTlvRef & psd_block = *j;
+            if (psd_block->get_tag().compare(TAG_PSD_TAG) != 0) {
+                continue;
+            }
+
+            const auto & aid_block = psd_block->find_by_tag(TAG_PSD_AID_TAG);
+            if (aid_block) {
+                // AID found!
+                apps.push_back(aid_block->get_data());
+            }
+        }
+
+    }
+
+    return apps;
+}
+
 int main(int argc, char **argv)
 {
     xpcsc::Connection c;
-
-    // xpcsc::Bytes test = xpcsc::parse_apdu("6F 15 84 0E 31 50 41 59 2E 53 59 53 2E 44 44 46 30 31 A5 03 88 01 01");
-    // std::cout << "TEST DATA: " << xpcsc::format(test) << std::endl;
-    // xpcsc::BerTlvRef t(xpcsc::BerTlv::parse(test));
-    // std::cout << "PRINT" << std::endl;
-    // return 123;
 
     try {
         c.init();
@@ -50,7 +164,7 @@ int main(int argc, char **argv)
     }
 
     // get readers list
-    std::vector<std::string> readers = c.readers();
+    auto readers = c.readers();
     if (readers.size() == 0) {
         std::cerr << "[E] No connected readers" << std::endl;
         return 1;
@@ -60,7 +174,7 @@ int main(int argc, char **argv)
     xpcsc::Reader reader;
 
     try {
-        std::string reader_name = *readers.begin();
+        auto reader_name = *readers.begin();
         std::cout << "Found reader: " << reader_name << std::endl;
         reader = c.wait_for_reader_card(reader_name);
     } catch (xpcsc::PCSCError &e) {
@@ -68,63 +182,15 @@ int main(int argc, char **argv)
         return 1;
     }
 
-
-    xpcsc::Bytes command;
-    xpcsc::Bytes response;
-    uint16_t response_status;
-
-    command.assign(xpcsc::parse_apdu("00 A4 04 00   0E  31 50 41 59 2E 53 59 53 2E 44 44 46 30 31"));
-    c.transmit(reader, command, &response);
-    response_status = c.response_status(response);
-
-    const xpcsc::Bytes TAG_EMV_FCI(xpcsc::parse_apdu("6F"));
-    const xpcsc::Bytes TAG_EMV_FCI_PR(xpcsc::parse_apdu("A5"));
-    const xpcsc::Bytes TAG_EMV_FCI_SFI(xpcsc::parse_apdu("88"));
-    const xpcsc::Bytes TAG_EMV_FCI_LANG(xpcsc::parse_apdu("5F 2D"));
-    const xpcsc::Bytes TAG_EMV_FCI_ISSUER(xpcsc::parse_apdu("9F 11"));
-    const xpcsc::Bytes TAG_EMV_FCI_ISSUER_DD(xpcsc::parse_apdu("BF 0C"));
-
-
-    if (response_status == 0x9000) {
-        // parse response data
-        xpcsc::BerTlvRef tlv(xpcsc::BerTlv::parse(response.substr(0, response.size()-2)));
-
-        // std::cout << xpcsc::format(*tlv) << std::endl;
-
-        const xpcsc::BerTlvList & items = tlv->get_children();
-        if (items.size() > 0 && items[0]->get_tag().compare(TAG_EMV_FCI)==0) {
-            // FCI
-            const xpcsc::BerTlvRef & p = items[0];
-
-            // find A5 block
-            const xpcsc::BerTlvRef & A5_block = p->find_by_tag(TAG_EMV_FCI_PR);
-            if (A5_block) {
-                // fetch SFI
-                const xpcsc::BerTlvRef & SFI_block = A5_block->find_by_tag(TAG_EMV_FCI_SFI);
-                if (SFI_block) {
-                    const xpcsc::Bytes & data = SFI_block->get_data();
-                }
-
-                // const xpcsc::BerTlvRef & LANG_block = A5_block->find_by_tag(TAG_EMV_FCI_LANG);
-                // if (LANG_block) {
-                //     xpcsc::Bytes data = LANG_block->get_data();
-                //     std::stringstream ss;
-                //     for (xpcsc::Bytes::const_iterator i=data.begin(); i!=data.end(); i++) {
-                //         ss << static_cast<char>(*i);
-                //     }
-                //     std::cout << "Lang pref: " << ss.str() << std::endl;
-                // }
-
-                // const xpcsc::BerTlvRef & ISSUER_block = A5_block->find_by_tag(TAG_EMV_FCI_ISSUER);
-                // if (ISSUER_block) {
-                //     const xpcsc::Bytes & data = ISSUER_block->get_data();
-                //     std::cout << "Issuer: " << xpcsc::format(data) << std::endl;
-                // }
-            }
-        }
-        // std::cout << "RESPONSE STATUS: " << c.response_status_str(response) << std::endl;
-        // std::cout << "RESPONSE: " << xpcsc::format(response) << std::endl;
+    auto apps = read_apps_from_pse(c, reader);
+    if (apps.size() == 0) {
+        std::cout << ">> Cannot fetch applications from PSE, trying some predefined AID" << std::endl;
     }
+
+    // take first AID
+    auto aid = *(apps.begin());
+
+    std::cout << "Found AID: " << xpcsc::format(aid) << std::endl;
 
     return 0;
 }

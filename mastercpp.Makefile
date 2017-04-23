@@ -24,6 +24,6 @@ clean:
 	rm -f $(BINARY) $(OBJS)
 
 %.o: %.cpp
-	g++ -Wall -c -o $@ $< $(CPPFLAGS)
+	g++ -Wall -std=c++11 -c -o $@ $< $(CPPFLAGS)
 
 .PHONY: libxpcsc
