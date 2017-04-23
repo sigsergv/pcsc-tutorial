@@ -60,8 +60,7 @@ Bytes parse_apdu(const std::string & apdu)
     Byte b1;
     Byte b2;
 
-    std::string::const_iterator i;
-    for (i=apdu.begin(); i!=apdu.end(); i++) {
+    for (auto i=apdu.begin(); i!=apdu.end(); i++) {
         char c = tolower(*i);
         if (c == ' ') {
             continue;

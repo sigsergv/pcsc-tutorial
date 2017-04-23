@@ -37,11 +37,11 @@ const char *sep_strings[] = {" ", ", ", ""};
 std::string format(const Bytes & b, FormatOptions fo)
 {
     char cbuf[32];
-    const char * fmt = format_strings[fo];
-    const std::string sep = std::string(sep_strings[fo]);
+    const auto fmt = format_strings[fo];
+    const auto sep = std::string(sep_strings[fo]);
 
-    Bytes::const_iterator i = b.begin();
-    Bytes::const_iterator end = b.end();
+    auto i = b.begin();
+    auto end = b.end();
     std::stringstream ss;
 
     while (1) {
@@ -62,7 +62,7 @@ std::string format(const Bytes & b, FormatOptions fo)
 std::string format(const Byte & c, FormatOptions fo)
 {
     char cbuf[32];
-    const char * fmt = format_strings[fo];
+    const auto fmt = format_strings[fo];
 
     snprintf(cbuf, 31, fmt, c);
     return cbuf;
@@ -72,7 +72,7 @@ std::string format(const BerTlv & tlv, FormatOptions fo, uint8_t indent_level)
 {
     std::stringstream ss;
     std::string indent(2*indent_level, ' ');
-    const Bytes & tag = tlv.get_tag();
+    const auto & tag = tlv.get_tag();
        
     if (tag.size() != 0) {
         ss << indent << "Tag: " << format(tlv.get_tag(), fo) << "\n";
@@ -80,7 +80,7 @@ std::string format(const BerTlv & tlv, FormatOptions fo, uint8_t indent_level)
     if (tlv.is_raw()) {
         ss << indent << "Data: " << format(tlv.get_data(), fo) << "\n";
     }
-    const BerTlvList & items = tlv.get_children();
+    const auto & items = tlv.get_children();
     BerTlvList::const_iterator i;
 
     for (i=items.begin(); i!=items.end(); i++) {

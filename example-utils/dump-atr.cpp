@@ -49,17 +49,16 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // get readers list
-    std::vector<std::string> readers = c.readers();
+    // connect to reader
+    auto readers = c.readers();
     if (readers.size() == 0) {
         std::cerr << "[E] No connected readers" << std::endl;
         return 1;
     }
 
-    // connect to reader
-    xpcsc::Reader reader = 0;
+    xpcsc::Reader reader;
     try {
-        std::string reader_name = *readers.begin();
+        auto reader_name = *readers.begin();
         std::cout << "Found reader: " << reader_name << std::endl;
         reader = c.wait_for_reader_card(reader_name);
     } catch (xpcsc::PCSCError &e) {

@@ -187,26 +187,27 @@ void Connection::transmit(const xpcsc::Reader & reader, const Bytes & command, B
 
     // PRINT_DEBUG("[D] Command length: " << send_buffer_size);
 
-    Byte *recv_buffer = new Byte[recv_buffer_size];
+    std::unique_ptr<Byte[]> recv_buffer(new Byte[recv_buffer_size]);
+    // Byte *recv_buffer = new Byte[recv_buffer_size];
 
     try {
         PCSC_CALL( SCardTransmit(reader.handle, reader.send_pci, 
             command.data(), send_buffer_size, NULL,
-            recv_buffer, &recv_length) );
+            recv_buffer.get(), &recv_length) );
 
         // analyze response status, if it's 61XX then more data available
         if (recv_length < 2) {
             throw ConnectionError("Invalid response (length<2)");
         }
 
-        if (recv_buffer[recv_length-2] == 0x61) {
+        if (recv_buffer.get()[recv_length-2] == 0x61) {
             // more data available (only for T=0)
-            collector.assign(recv_buffer, recv_length - 2);
-            xpcsc::Byte cmd_get_response[] = {0x00, INS_GET_RESPONSE, 0x00, 0x00, 0x00};
+            collector.assign(recv_buffer.get(), recv_length - 2);
+            xpcsc::Byte cmd_get_response[] = {0x00, 0xC0, 0x00, 0x00, 0x00};
 
             do {
                 // read next portion
-                uint8_t size = recv_buffer[recv_length - 1];
+                uint8_t size = recv_buffer.get()[recv_length - 1];
                 if (size == 0) {
                     size = 0xFF;
                 }
@@ -215,35 +216,32 @@ void Connection::transmit(const xpcsc::Reader & reader, const Bytes & command, B
                 recv_length = recv_buffer_size;
                 PCSC_CALL( SCardTransmit(reader.handle, reader.send_pci, 
                     cmd_get_response, 5, NULL,
-                    recv_buffer, &recv_length) );
+                    recv_buffer.get(), &recv_length) );
 
                 if (recv_length < 2) {
                     throw ConnectionError("Invalid response (length<2)");
                 }
 
-                if (recv_buffer[recv_length-2] == 0x61) {
+                if (recv_buffer.get()[recv_length-2] == 0x61) {
                     // append data and continue
-                    collector.append(recv_buffer, recv_length-2);
+                    collector.append(recv_buffer.get(), recv_length-2);
                     continue;
                 }
-                if (recv_buffer[recv_length-2] == 0x90 && recv_buffer[recv_length-1] == 0x00) {
+                if (recv_buffer.get()[recv_length-2] == 0x90 && recv_buffer[recv_length-1] == 0x00) {
                     // finished
-                    collector.append(recv_buffer, recv_length);
+                    collector.append(recv_buffer.get(), recv_length);
                     break;
                 }
                 // something happened, return just status code
-                collector.assign(recv_buffer, recv_length);
+                collector.assign(recv_buffer.get(), recv_length);
                 break;
             } while (1);
         } else {
-            collector.assign(recv_buffer, recv_length);
+            collector.assign(recv_buffer.get(), recv_length);
         }
     } catch (PCSCError &e) {
-        delete[] recv_buffer;
         throw e;
     }
-
-    delete[] recv_buffer;
 
     if (response != 0) {
         response->assign(collector);

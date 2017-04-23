@@ -97,15 +97,15 @@ int main(int argc, char **argv)
     }
 
     // template for Load Keys command
-    const xpcsc::Byte CMD_LOAD_KEYS[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
+    const xpcsc::Byte CMD_LOAD_KEYS[] = {0xFF, 0x82, 0x00, 0x00, 
         0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     // template for General Auth command
-    const xpcsc::Byte CMD_GENERAL_AUTH[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
+    const xpcsc::Byte CMD_GENERAL_AUTH[] = {0xFF, 0x86, 0x00, 0x00, 
         0x05, 0x01, 0x00, 0x00, 0x60, 0x00};
 
     // template for Read Binary command
-    const xpcsc::Byte CMD_READ_BINARY[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
+    const xpcsc::Byte CMD_READ_BINARY[] = {0xFF, 0xB0, 0x00, 0x00, 0x10};
 
     // standard keys
     const size_t keys_number = 3;

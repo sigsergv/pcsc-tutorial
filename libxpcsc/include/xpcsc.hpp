@@ -57,20 +57,6 @@ struct Reader {
     SCARD_IO_REQUEST *send_pci;
 };
 
-// some useful constants
-// CLA
-const Byte CLA_PICC = 0xff;
-
-// INS
-const Byte INS_MIFARE_LOAD_KEYS = 0x82;
-const Byte INS_MIFARE_GENERAL_AUTH = 0x86;
-const Byte INS_MIFARE_READ_BINARY = 0xB0;
-const Byte INS_MIFARE_UPDATE_BINARY = 0xD6;
-const Byte INS_PICC_GET_DATA = 0xca;
-
-const Byte INS_SELECT = 0xA4;
-const Byte INS_GET_RESPONSE = 0xC0;
-
 // ATR features constants
 typedef enum { 
     // smart card with contacts

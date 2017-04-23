@@ -103,7 +103,7 @@ void help(const std::string & program)
 
 std::string arg_keys(const xpcsc::Strings args)
 {
-    xpcsc::Strings::const_iterator p = std::find(args.begin(), args.end(), "-f");
+    auto p = std::find(args.begin(), args.end(), "-f");
     std::string filename;
 
     if (p == args.end()) {
@@ -141,8 +141,8 @@ bool parse_hex(const std::string & str, Byte6 data)
     bool ok;
     size_t pos = 0;
 
-    for (std::string::const_iterator i=str.begin(); i!=str.end(); i++) {
-        xpcsc::Byte c1 = char2val(*i, ok);
+    for (auto i=str.begin(); i!=str.end(); i++) {
+        auto c1 = char2val(*i, ok);
         if (!ok) {
             return false;
         }
@@ -297,20 +297,18 @@ bool read_keys(std::ifstream & file, Keys & keys)
     return true;
 }
 
-const xpcsc::Byte CMD_LOAD_KEYS[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_LOAD_KEYS, 0x00, 0x00, 
+const xpcsc::Byte CMD_LOAD_KEYS[] = {0xFF, 0x82, 0x00, 0x00, 
     0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 // template for General Auth command
-const xpcsc::Byte CMD_GENERAL_AUTH[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_GENERAL_AUTH, 0x00, 0x00, 
+const xpcsc::Byte CMD_GENERAL_AUTH[] = {0xFF, 0x86, 0x00, 0x00, 
     0x05, 0x01, 0x00, 0x00, 0x60, 0x00};
 
 // template for Read Binary command
-const xpcsc::Byte CMD_READ_BINARY[] = {xpcsc::CLA_PICC, xpcsc::INS_MIFARE_READ_BINARY, 0x00, 0x00, 0x10};
+const xpcsc::Byte CMD_READ_BINARY[] = {0xFF, 0xB0, 0x00, 0x00, 0x10};
 
 bool read_mifare_1k(xpcsc::Connection & c, xpcsc::Reader reader, const Keys & keys, CardContents & card)
 {
-
-
     // 16 sectors, 4 blocks each
     xpcsc::Bytes command;
     xpcsc::Bytes response;
@@ -326,7 +324,7 @@ bool read_mifare_1k(xpcsc::Connection & c, xpcsc::Reader reader, const Keys & ke
             b.is_access_set = false;
         }
 
-        Keys::const_iterator ps = keys.find(sector);
+        auto ps = keys.find(sector);
         if (ps == keys.end()) {
             // no key, all 4 blocks are not possible to read
             continue;  // next sector
@@ -494,18 +492,17 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // get readers list
-    std::vector<std::string> readers = c.readers();
+    // connect to reader
+    auto readers = c.readers();
     if (readers.size() == 0) {
         std::cerr << "[E] No connected readers" << std::endl;
         return 1;
     }
 
-    // connect to reader
-    xpcsc::Reader reader = 0;
+    xpcsc::Reader reader;
     try {
-        std::string reader_name = *readers.begin();
-        PRINT_DEBUG("Found reader: " << reader_name);
+        auto reader_name = *readers.begin();
+        std::cout << "Found reader: " << reader_name << std::endl;
         reader = c.wait_for_reader_card(reader_name);
     } catch (xpcsc::PCSCError &e) {
         std::cerr << "Wait for card failed: " << e.what() << std::endl;
@@ -513,7 +510,7 @@ int main(int argc, char **argv)
     }
 
     // fetch and parse ATR
-    xpcsc::Bytes atr = c.atr(reader);
+    auto atr = c.atr(reader);
     xpcsc::ATRParser p;
     p.load(atr);
 

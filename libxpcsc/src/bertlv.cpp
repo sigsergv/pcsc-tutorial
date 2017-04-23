@@ -122,7 +122,7 @@ BerTlv::~BerTlv()
 PBerTlv BerTlv::parse(const Bytes & data)
 {
     Bytes empty_tag;
-    PBerTlv x = new BerTlv(empty_tag, data);
+    auto x = new BerTlv(empty_tag, data);
     return x;
 }
 

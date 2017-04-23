@@ -21,7 +21,7 @@ libxpcsc.a: connection.o exceptions.o format.o parse_apdu.o access_bits.o atrpar
 	ar -rcs $@ $^
 
 %.o: %.cpp ../include/xpcsc.hpp
-	g++ -Wall -c $< $(CPPFLAGS) -o $@
+	g++ -Wall -std=c++11 -c $< $(CPPFLAGS) -o $@
 
 # connection.o: connection.cpp ../include/xpcsc.hpp 
 # 	g++ -Wall -c -o $@ connection.cpp $(CPPFLAGS)

@@ -30,6 +30,6 @@ clean:
 	rm -f $(SIMPLE_BINARIES) *.o
 
 %.o: %.cpp
-	g++ -Wall -c -o $@ $< $(CPPFLAGS)
+	g++ -std=c++11 -Wall -c -o $@ $< $(CPPFLAGS)
 
 .PHONY: libxpcsc

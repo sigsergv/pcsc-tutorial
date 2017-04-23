@@ -98,6 +98,7 @@ std::vector<xpcsc::Bytes> read_apps_from_pse(xpcsc::Connection & c, xpcsc::Reade
     xpcsc::Byte P2 = (sfi << 3) | 4;
 
     // read Payment System Directory
+    //         CLA   INS   P1    P2  Le
     command = {0x00, 0xB2, 0x00, P2, 0x00};
 
     for (xpcsc::Byte i=1; i<=10; i++) {
@@ -185,6 +186,7 @@ int main(int argc, char **argv)
     auto apps = read_apps_from_pse(c, reader);
     if (apps.size() == 0) {
         std::cout << ">> Cannot fetch applications from PSE, trying some predefined AID" << std::endl;
+        return 0;
     }
 
     // take first AID
