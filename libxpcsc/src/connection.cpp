@@ -135,13 +135,17 @@ xpcsc::Reader Connection::wait_for_reader_card(const std::string & reader_name, 
         SCARD_SHARE_SHARED, preferred_protocols,
         &(reader.handle), &active_protocol) );
 
+    SCARD_IO_REQUEST * pci = new SCARD_IO_REQUEST;
     if (active_protocol == SCARD_PROTOCOL_T0) {
-        reader.send_pci = SCARD_PCI_T0;
+        pci->dwProtocol = SCARD_PCI_T0->dwProtocol;
+        pci->cbPciLength = SCARD_PCI_T0->cbPciLength;
     } else if (active_protocol == SCARD_PROTOCOL_T1) {
-        reader.send_pci = SCARD_PCI_T1;
+        pci->dwProtocol = SCARD_PCI_T1->dwProtocol;
+        pci->cbPciLength = SCARD_PCI_T1->cbPciLength;
     } else {
         throw ConnectionError("Not supported protocol!");
     }
+    reader.send_pci = pci;
 
     return reader;
 }
