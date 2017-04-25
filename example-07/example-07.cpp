@@ -333,9 +333,11 @@ bool read_app(xpcsc::Connection & c, xpcsc::Reader & reader, const xpcsc::Bytes 
         return false;
     }
 
+
     const auto & po_tlv = xpcsc::BerTlv::parse(response.substr(0, response.size()-2));
     const auto & po_tlv_d = po_tlv->get_children().at(0);
 
+    // std::cout << "GET " << xpcsc::format(*po_tlv) << std::endl;
     xpcsc::Bytes aip;
     xpcsc::Bytes afl;
 
@@ -377,6 +379,8 @@ bool read_app(xpcsc::Connection & c, xpcsc::Reader & reader, const xpcsc::Bytes 
 
         for (size_t j=first_rec_num; j<=last_rec_num; j++) {
             command[2] = j;
+            command[4] = 0;
+
             c.transmit(reader, command, &response);
             response_status = c.response_status(response);
             if ((response_status >> 8) == 0x6C) {
