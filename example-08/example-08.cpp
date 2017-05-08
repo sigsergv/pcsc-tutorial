@@ -32,11 +32,34 @@
 #include <unordered_map>
 
 #include <cstring>
+#include <string>
 #include <unistd.h>
 
 #include "apps.hpp"
 
 #define CHECK_BIT(value, b) (((value) >> (b))&1)
+
+const xpcsc::Bytes TAG_EMV_FCI = {0x6F};
+
+std::string format_fci(const xpcsc::BerTlv & tlv)
+{
+    std::stringstream ss;
+
+    // find element with tag `6F`
+    const auto & FCI_block = tlv.find_by_tag(TAG_EMV_FCI);
+
+    if (!FCI_block) {
+        throw std::invalid_argument("Not FCI template");
+    }
+
+    ss << "FCI template:\n";
+    // iterate over top level elements
+    const auto & items = FCI_block->get_children();
+    for (auto i=items.begin(); i!=items.end(); i++) {
+        ss << "  Tag: " << xpcsc::format((*i)->get_tag()) << "\n";
+    }
+    return ss.str();
+}
 
 xpcsc::Bytes select_app_apdu(const std::string & aid)
 {
@@ -103,6 +126,15 @@ int main(int argc, char **argv)
         }
 
         std::cout << "Probe successful for AID: " << aid << " - " << desc << std::endl;
+        auto tlv = xpcsc::BerTlv::parse(response.substr(0, response.size()-2));
+        std::cout << "Parsed response:" << std::endl;
+        try {
+            std::cout << format_fci(*tlv) << std::endl;
+        } catch (std::invalid_argument e) {
+            // print response
+            std::cout << "No FCI: " << xpcsc::format(response) << std::endl;
+        }
+
     }
 
     return 0;

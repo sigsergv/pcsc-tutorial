@@ -285,7 +285,12 @@ const std::vector<std::string> KNOWN_APPLICATIONS = {
     "E80704007F00070302|nPA  ",
     "E82881C11702|AlphaCard application  ",
     "E828BD080F|ISO-7816-15 EF.DIR  ",
-    "F0000000030001|BRADESCO EMV"
+    "F0000000030001|BRADESCO EMV",
+
+    // some additional items
+    "A000000151000000|Default Card Manager (GP)",
+    "A000000432554543495344|UEK Main Security Domain",
+    "A00000043255454353534431|UEK Secondary Security Domain" // see http://www.uecard.ru/upload/files/pdf/ps-uek/pravila-fuo/2-1/ОД-10_Спецификация_УЭК_2.1.pdf
 };
 
 
