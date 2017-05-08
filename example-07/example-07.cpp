@@ -289,7 +289,6 @@ bool read_app(xpcsc::Connection & c, xpcsc::Reader & reader, const xpcsc::Bytes 
     }
 
     // setup GET PROCESSING OPTIONS command
-    // SELECT Payment System Environment (PSE)
     //                                CLA INS P1 P2 
     command.assign(xpcsc::parse_apdu("80  A8  00 00"));
 
