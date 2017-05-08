@@ -238,7 +238,7 @@ bool read_app(xpcsc::Connection & c, xpcsc::Reader & reader, const xpcsc::Bytes 
     xpcsc::Bytes response;
     uint16_t response_status;
 
-    // SELECT Payment System Environment (PSE)
+    // SELECT application
     //                                CLA INS P1 P2 
     command.assign(xpcsc::parse_apdu("00  A4  04 00"));
     command.push_back(static_cast<xpcsc::Byte>(aid.size()));
