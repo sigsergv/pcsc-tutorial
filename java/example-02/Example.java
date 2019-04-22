@@ -3,6 +3,7 @@ import javax.smartcardio.*;
 
 class Example {
     public static class TerminalNotFoundException extends Exception {}
+    public static class CardNotFoundException extends Exception {}
 
     public static void main(String[] args) {
         try {
@@ -19,7 +20,12 @@ class Example {
             System.out.printf("Using reader %s%n", reader.toString());
 
             // connect with the card using any available protocol ("*")
-            Card card = reader.connect("*");
+            Card card;
+            try {
+                card = reader.connect("*");
+            } catch (CardException e) {
+                throw new CardNotFoundException();
+            }
 
             // read protocol and card ATR
             System.out.printf("  Card protocol: %s%n", card.getProtocol());
@@ -27,6 +33,8 @@ class Example {
 
         } catch (TerminalNotFoundException e) {
             System.out.println("No connected readers.");
+        } catch (CardNotFoundException e) {
+            System.out.println("Card not connected.");
         } catch (CardException e) {
             System.out.println("CardException: " + e.toString());
         }
