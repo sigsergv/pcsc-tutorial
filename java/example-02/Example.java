@@ -59,6 +59,9 @@ class Example {
             System.out.printf("  Card protocol: %s%n", card.getProtocol());
             System.out.printf("  Card ATR: %s%n", printBytes(card.getATR().getBytes()));
 
+            // disconnect card
+            card.disconnect(false);
+
         } catch (TerminalNotFoundException e) {
             System.out.println("No connected readers.");
         } catch (CardNotFoundException e) {
