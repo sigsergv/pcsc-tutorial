@@ -42,15 +42,15 @@ class Example {
                 throw new TerminalNotFoundException();
             }
 
-            // get first reader
-            CardTerminal reader = terminals.get(0);
+            // get first terminal
+            CardTerminal terminal = terminals.get(0);
 
-            System.out.printf("Using reader %s%n", reader.toString());
+            System.out.printf("Using terminal %s%n", terminal.toString());
 
             // connect with the card using any available protocol ("*")
             Card card;
             try {
-                card = reader.connect("*");
+                card = terminal.connect("*");
             } catch (CardException e) {
                 throw new CardNotFoundException();
             }

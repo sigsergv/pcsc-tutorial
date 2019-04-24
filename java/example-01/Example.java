@@ -33,12 +33,12 @@ class Example {
         try {
             TerminalFactory factory = TerminalFactory.getDefault();
             List<CardTerminal> terminals = factory.terminals().list();
-            System.out.println("Found readers:");
+            System.out.println("Found terminals:");
 
             int i = 0;
             for (CardTerminal t : terminals) {
                 ++i;
-                System.out.printf("  Reader #%d: %s %n", i, t.toString());
+                System.out.printf("  Terminal #%d: %s %n", i, t.toString());
             }
         } catch (CardException e) {
             System.out.println("CardException: " + e.toString());
