@@ -3,7 +3,7 @@
 	[
 		{
 			"path": ".",
-            "file_exclude_patterns": ["*.o", "*.a", "*.sublime-*"],
+            "file_exclude_patterns": ["*.o", "*.a", "*.sublime-*", "*.class"],
             "folder_exclude_patterns": []
 		}
 	]
