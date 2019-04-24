@@ -38,7 +38,7 @@ class Example {
             int i = 0;
             for (CardTerminal t : terminals) {
                 ++i;
-                System.out.printf("  Terminal #%d: %s %n", i, t.toString());
+                System.out.printf("  Terminal #%d: %s %n", i, t.getName());
             }
         } catch (CardException e) {
             System.out.println("CardException: " + e.toString());
