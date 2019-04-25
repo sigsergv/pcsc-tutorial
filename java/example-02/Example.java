@@ -54,19 +54,19 @@ class Example {
 
             // read protocol and card ATR
             System.out.printf("  Card protocol: %s%n", card.getProtocol());
-            System.out.printf("  Card ATR: %s%n", printBytes(card.getATR().getBytes()));
+            System.out.printf("  Card ATR: %s%n", hexify(card.getATR().getBytes()));
 
             // disconnect card
             card.disconnect(false);
 
         } catch (TerminalNotFoundException e) {
-            System.out.println("No connected readers.");
+            System.out.println("No connected terminals.");
         } catch (CardException e) {
             System.out.println("CardException: " + e.toString());
         }
     }
 
-    public static String printBytes(byte[] bytes) {
+    public static String hexify(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
             sb.append(String.format("%02X ", b));

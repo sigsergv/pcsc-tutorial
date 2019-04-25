@@ -62,20 +62,20 @@ class Example {
             // 1. load key
             //                      CLA   INS   P1    P2    Lc    Command bytes
             int[] loadKeyCommand = {0xFF, 0x82, 0x00, 0x00, 0x06, 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,};
-            answer = channel.transmit(new CommandAPDU(commandBytes(loadKeyCommand)));
-            System.out.printf("Response: %s%n", printBytes(answer.getBytes()));
+            answer = channel.transmit(new CommandAPDU(toByteArray(loadKeyCommand)));
+            System.out.printf("Response: %s%n", hexify(answer.getBytes()));
 
             // 2. authentication
             //                           CLA   INS   P1    P2    Lc    Command bytes
             int[] authenticateCommand = {0xFF, 0x86, 0x00, 0x00, 0x05, 0x01,0x00,0x00,0x60,0x00};
-            answer = channel.transmit(new CommandAPDU(commandBytes(authenticateCommand)));
-            System.out.printf("Response: %s%n", printBytes(answer.getBytes()));
+            answer = channel.transmit(new CommandAPDU(toByteArray(authenticateCommand)));
+            System.out.printf("Response: %s%n", hexify(answer.getBytes()));
 
             // 3. read data
             //                        CLA   INS   P1    P2    Le
             int[] readBlockCommand = {0xFF, 0xB0, 0x00, 0x00, 0x10};
-            answer = channel.transmit(new CommandAPDU(commandBytes(readBlockCommand)));
-            System.out.printf("Response: %s%n", printBytes(answer.getBytes()));
+            answer = channel.transmit(new CommandAPDU(toByteArray(readBlockCommand)));
+            System.out.printf("Response: %s%n", hexify(answer.getBytes()));
 
             // disconnect card
             card.disconnect(false);
@@ -89,7 +89,7 @@ class Example {
         }
     }
 
-    public static String printBytes(byte[] bytes) {
+    public static String hexify(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
             sb.append(String.format("%02X ", b));
@@ -97,7 +97,7 @@ class Example {
         return sb.toString();
     }
 
-    public static byte[] commandBytes(int[] list) {
+    public static byte[] toByteArray(int[] list) {
         int s = list.length;
         byte[] buf = new byte[s];
         int i;
