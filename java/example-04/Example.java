@@ -42,15 +42,15 @@ class Example {
                 throw new TerminalNotFoundException();
             }
 
-            // get first reader
-            CardTerminal reader = terminals.get(0);
+            // get first terminal
+            CardTerminal terminal = terminals.get(0);
 
-            System.out.printf("Using reader %s%n", reader.toString());
+            System.out.printf("Using terminal %s%n", terminal.toString());
 
-            // connect with the card using any available protocol ("*")
+            // connect with the card using protocol ("T=1")
             Card card;
             try {
-                card = reader.connect("T=1");
+                card = terminal.connect("T=1");
             } catch (CardException e) {
                 throw new CardNotFoundException();
             }
@@ -81,7 +81,7 @@ class Example {
             card.disconnect(false);
 
         } catch (TerminalNotFoundException e) {
-            System.out.println("No connected readers.");
+            System.out.println("No connected terminals.");
         } catch (CardNotFoundException e) {
             System.out.println("Card not connected.");
         } catch (CardException e) {
