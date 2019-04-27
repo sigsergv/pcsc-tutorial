@@ -28,10 +28,12 @@
 
 import java.util.List;
 import javax.smartcardio.*;
+import static java.util.Arrays.copyOfRange;
+import static java.lang.Math.max;
 
 class Example {
     public static class TerminalNotFoundException extends Exception {}
-    public static class CardNotFoundException extends Exception {}
+    public static class InstructionFailedException extends Exception {}
 
     public static void main(String[] args) {
         try {
@@ -47,43 +49,53 @@ class Example {
 
             System.out.printf("Using terminal %s%n", terminal.toString());
 
-            // connect with the card using protocol ("T=1")
-            Card card;
-            try {
-                card = terminal.connect("T=1");
-            } catch (CardException e) {
-                throw new CardNotFoundException();
-            }
+            // wait for card, indefinitely until card appears
+            terminal.waitForCardPresent(0);
+
+            // establish a connection to the card using protocol T=1
+            Card card = terminal.connect("T=1");
 
             // obtain logical channel
             CardChannel channel = card.getBasicChannel();
             ResponseAPDU answer;
 
+            byte[] command;
+
             // 1. load key
-            //                      CLA   INS   P1    P2    Lc    Command bytes
-            int[] loadKeyCommand = {0xFF, 0x82, 0x00, 0x00, 0x06, 0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,};
-            answer = channel.transmit(new CommandAPDU(toByteArray(loadKeyCommand)));
-            System.out.printf("Response: %s%n", hexify(answer.getBytes()));
+            //                     CLA  INS  P1  P2  Lc  Data
+            command = toByteArray("FF   82   00  00  06  FF FF FF FF FF FF");
+            answer = channel.transmit(new CommandAPDU(command));
+            if (answer.getSW() != 0x9000) {
+                System.out.printf("Response failed: %s%n", hexify(answer.getBytes()));
+                throw new InstructionFailedException();
+            }
 
             // 2. authentication
-            //                           CLA   INS   P1    P2    Lc    Command bytes
-            int[] authenticateCommand = {0xFF, 0x86, 0x00, 0x00, 0x05, 0x01,0x00,0x00,0x60,0x00};
-            answer = channel.transmit(new CommandAPDU(toByteArray(authenticateCommand)));
-            System.out.printf("Response: %s%n", hexify(answer.getBytes()));
+            //                     CLA  INS  P1  P2  Lc  Data
+            command = toByteArray("FF   86   00  00  05  01 00 00 60 00");
+            answer = channel.transmit(new CommandAPDU(command));
+            if (answer.getSW() != 0x9000) {
+                System.out.printf("Response failed: %s%n", hexify(answer.getBytes()));
+                throw new InstructionFailedException();
+            }
 
             // 3. read data
-            //                        CLA   INS   P1    P2    Le
-            int[] readBlockCommand = {0xFF, 0xB0, 0x00, 0x00, 0x10};
-            answer = channel.transmit(new CommandAPDU(toByteArray(readBlockCommand)));
-            System.out.printf("Response: %s%n", hexify(answer.getBytes()));
+            //                     CLA  INS  P1  P2  Le
+            command = toByteArray("FF   B0   00  00  10");
+            answer = channel.transmit(new CommandAPDU(command));
+            if (answer.getSW() != 0x9000) {
+                System.out.printf("Response failed: %s%n", hexify(answer.getBytes()));
+                throw new InstructionFailedException();
+            }
+            System.out.printf("Block data: %s%n", hexify(responseDataOnly(answer.getBytes())));
 
             // disconnect card
             card.disconnect(false);
 
+        } catch (InstructionFailedException e) {
+            System.out.println("Instruction execution failed.");
         } catch (TerminalNotFoundException e) {
             System.out.println("No connected terminals.");
-        } catch (CardNotFoundException e) {
-            System.out.println("Card not connected.");
         } catch (CardException e) {
             System.out.println("CardException: " + e.toString());
         }
@@ -97,14 +109,30 @@ class Example {
         return sb.toString();
     }
 
-    public static byte[] toByteArray(int[] list) {
-        int s = list.length;
-        byte[] buf = new byte[s];
-        int i;
+    public static byte[] responseDataOnly(byte[] data) {
+        return copyOfRange(data, 0, max(data.length-2, 0));
+    }
 
-        for (i=0; i<s; i++) {
-            buf[i] = (byte)list[i];
+    public static byte[] toByteArray(String s) {
+        int len = s.length();
+        byte[] buf = new byte[len/2];
+        int bufLen = 0;
+        int i = 0;
+        
+        while (i < len) {
+            char c1 = s.charAt(i);
+            i++;
+            if (c1 == ' ') {
+                continue;
+            }
+            char c2 = s.charAt(i);
+            i++;
+
+            byte d = (byte)((Character.digit(c1, 16) << 4) + (Character.digit(c2, 16)));
+            buf[bufLen] = d;
+            ++bufLen;
         }
-        return buf;
+
+        return copyOfRange(buf, 0, bufLen);
     }
 }
