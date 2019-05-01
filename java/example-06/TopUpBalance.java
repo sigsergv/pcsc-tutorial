@@ -27,18 +27,33 @@
 
 import java.util.List;
 import javax.smartcardio.*;
+import static java.util.Arrays.copyOfRange;
 
-// This class Issues a new card:
-//   * scan provided card
-//   * if it matches requirements then initialize with a new keys and data
-//   * if it doesn't then print error message explaining why
-//   * quit
-class IssueCard {
 
+// Add money to card.
+class TopUpBalance {
     public static void main(String[] args) {
         // load project configuration data
         Util.Config config = Util.loadConfig();
 
+        if (args.length != 1) {
+            System.out.println("Amount of funds is required.");
+            System.exit(1);
+        }
+
+        int funds = 0;
+        try {
+            funds = Integer.decode(args[0]);
+        } catch (NumberFormatException e) {
+            System.out.println("Incorrect amount specified.");
+            System.exit(1);
+        }
+
+        if (funds <= 0) {
+            System.out.println("Amount of funds must be a positive integer value.");
+            System.exit(1);
+        }
+        
         try {
             TerminalFactory factory = TerminalFactory.getDefault();
             List<CardTerminal> terminals = factory.terminals().list();
@@ -49,14 +64,13 @@ class IssueCard {
 
             CardTerminal terminal = terminals.get(0);
 
-            System.out.printf("Issue a new Balance Card%n========================%n");
+            System.out.printf("Top up card balance%n===================%n");
 
             if (!terminal.isCardPresent()) {
-                System.out.println("Please place a new non-initialized card on the terminal.");
+                System.out.println("Please place a card on the terminal.");
             }
             terminal.waitForCardPresent(0);
 
-            System.out.printf("Checking card sector %d... ", config.sector);
             Card card = terminal.connect("T=1");
             CardChannel channel = card.getBasicChannel();
 
@@ -64,57 +78,48 @@ class IssueCard {
             byte[] readBinaryCommand = Util.toByteArray("FF B0 00 00 10");
             byte[] updateBinaryCommand = Util.toByteArray("FF D6 00 00 10 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00");
             byte firstBlock = (byte)(config.sector * 4);
+            ResponseAPDU answer;
             byte[] data;
             byte[] command;
 
-            ResponseAPDU answer;
-
-            // load Key A to cell 00
-            byte[] loadKeysCommand = Util.toByteArray("FF 82 00 00 06 " + config.initial_key_a);
+            // load production Key B to cell 00
+            byte[] loadKeysCommand = Util.toByteArray("FF 82 00 00 06 " + config.prod_key_b);
             answer = channel.transmit(new CommandAPDU(loadKeysCommand));
             if (answer.getSW() != 0x9000) {
                 card.disconnect(false);
-                throw new Util.CardCheckFailedException("Failed to load Key A into terminal.");
+                throw new Util.CardCheckFailedException("Failed to load Key B into terminal.");
             }
 
-            // check Key A only: authenticate for the trailer block
-            authenticateCommand[7] = (byte)(firstBlock+3);
-            authenticateCommand[8] = 0x60;
+            // authenticate using Key B
+            authenticateCommand[7] = firstBlock;
+            authenticateCommand[8] = 0x61; 
             answer = channel.transmit(new CommandAPDU(authenticateCommand));
             if (answer.getSW() != 0x9000) {
                 card.disconnect(false);
-                throw new Util.CardCheckFailedException("Key A doesn't match.");
+                throw new Util.CardCheckFailedException("Key B doesn't match.");
             }
 
-            // read trailer block data
-            readBinaryCommand[3] = (byte)(firstBlock+3);
+            // read balance block data
+            readBinaryCommand[3] = firstBlock;
             answer = channel.transmit(new CommandAPDU(readBinaryCommand));
             if (answer.getSW() != 0x9000) {
                 card.disconnect(false);
                 throw new Util.CardCheckFailedException("Failed to read block with Key A.");
             }
-            // read trailer and check that we should be able to set both keys and change access 
-            readBinaryCommand[3] = (byte)(firstBlock+3);
-            answer = channel.transmit(new CommandAPDU(readBinaryCommand));
-            if (answer.getSW() != 0x9000) {
-                card.disconnect(false);
-                throw new Util.CardCheckFailedException("Failed to read trailer with Key A.");
-            }
-            byte[] trailerData = Util.responseDataOnly(answer.getBytes());
-            String[] accessBits = Util.decodeAccessBits(trailerData[6], trailerData[7], trailerData[8]);
-            if (!accessBits[3].equals("001")) {
-                card.disconnect(false);
-                throw new Util.CardCheckFailedException("Access condition bits don't match.");
-            }
-            System.out.printf("success%n");
+            // take first 8 bytes
+            data = Util.responseDataOnly(answer.getBytes());
+            data = copyOfRange(data, 0, 8);
+            long balance = Util.bytesToLong(data);
 
-            // write data
-            System.out.printf("Writing data... ");
-            // store empty balance to first block
-            data = new byte[16];
+            long newBalance = balance + funds;
 
             // create APDU by cloning updateBinaryCommand template, specify target
             // block address and copy data block
+            byte[] newBalanceBytes = Util.longToBytes(newBalance);
+            data = new byte[16];
+            for (int i=0; i<8; i++) {
+                data[i] = newBalanceBytes[i];
+            }
             command = updateBinaryCommand.clone();
             command[3] = firstBlock;
             for (int i=0; i<16; i++) {
@@ -126,38 +131,7 @@ class IssueCard {
                 throw new Util.CardUpdateFailedException("Failed to update data block.");
             }
 
-            // create trailer data
-            data = new byte[16];
-            // fill with new Key A and Key B
-            byte[] prodKeyA = Util.toByteArray(config.prod_key_a);
-            byte[] prodKeyB = Util.toByteArray(config.prod_key_b);
-            for (int i=0; i<6; i++) {
-                data[i] = prodKeyA[i];
-                data[10+i] = prodKeyB[i];
-            }
-            // force set user byte to 0xFF
-            data[9] = (byte)0xFF;
-
-            // calculate access conditions bytes
-            String[] accessConditionBits = {"000", "111", "111", "001"};
-            byte[] ac = Util.encodeAccessBits(accessConditionBits);
-            data[6] = ac[0];
-            data[7] = ac[1];
-            data[8] = ac[2];
-
-            // create APDU by cloning updateBinaryCommand template, specify target
-            // block address (trailer) and copy data block
-            command = updateBinaryCommand.clone();
-            command[3] = (byte)(firstBlock+3);
-            for (int i=0; i<16; i++) {
-                command[5+i] = data[i];
-            }
-            answer = channel.transmit(new CommandAPDU(command));
-            if (answer.getSW() != 0x9000) {
-                card.disconnect(false);
-                throw new Util.CardUpdateFailedException("Failed to update data block.");
-            }
-            System.out.printf("success%n");
+            System.out.printf("New balance is: %d%n", newBalance);
 
             card.disconnect(false);
         } catch (Util.TerminalNotFoundException e) {

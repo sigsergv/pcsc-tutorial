@@ -30,11 +30,23 @@ import java.io.IOException;
 import java.io.FileNotFoundException;
 import java.util.Properties;
 import static java.util.Arrays.copyOfRange;
+// import static java.util.Arrays.fill;
 import static java.lang.Math.max;
 
 // local utility class
 class Util {
     public static class TerminalNotFoundException extends Exception {}
+
+    static class CardCheckFailedException extends Exception{
+        public CardCheckFailedException(String message) {
+            super(message);
+        }
+    }
+    static class CardUpdateFailedException extends Exception{
+        public CardUpdateFailedException(String message) {
+            super(message);
+        }
+    };
 
     public static class Config {
         public int sector;
@@ -104,12 +116,94 @@ class Util {
         return copyOfRange(data, 0, max(data.length-2, 0));
     }
 
+    public static String[] decodeAccessBits(byte b6, byte b7, byte b8) {
+        String[] bits = {
+            decodeAccessBits(b6, b7, b8, 0),
+            decodeAccessBits(b6, b7, b8, 1),
+            decodeAccessBits(b6, b7, b8, 2),
+            decodeAccessBits(b6, b7, b8, 3)
+        };
+        return bits;
+    }
+
+    public static byte[] encodeAccessBits(String[] bits) {
+        // [
+        //   [C10, C20, C30],
+        //   [C11, C21, C31],
+        //   [C12, C22, C32],
+        //   [C13, C23, C33],
+        // ]
+        if (bits.length != 4) {
+            throw new AssertionError("Bits specs array length must be 4.");
+        }
+        byte b6 = 0;
+        byte b7 = 0;
+        byte b8 = 0;
+
+        b6 |= (bits[3].charAt(1)=='0'?1:0);
+        b6 <<= 1;
+        b6 |= (bits[2].charAt(1)=='0'?1:0);
+        b6 <<= 1;
+        b6 |= (bits[1].charAt(1)=='0'?1:0);
+        b6 <<= 1;
+        b6 |= (bits[0].charAt(1)=='0'?1:0);
+        b6 <<= 1;
+        b6 |= (bits[3].charAt(0)=='0'?1:0);
+        b6 <<= 1;
+        b6 |= (bits[2].charAt(0)=='0'?1:0);
+        b6 <<= 1;
+        b6 |= (bits[1].charAt(0)=='0'?1:0);
+        b6 <<= 1;
+        b6 |= (bits[0].charAt(0)=='0'?1:0);
+
+        b7 |= (bits[3].charAt(0)=='0'?0:1);
+        b7 <<= 1;
+        b7 |= (bits[2].charAt(0)=='0'?0:1);
+        b7 <<= 1;
+        b7 |= (bits[1].charAt(0)=='0'?0:1);
+        b7 <<= 1;
+        b7 |= (bits[0].charAt(0)=='0'?0:1);
+        b7 <<= 1;
+        b7 |= (bits[3].charAt(2)=='0'?1:0);
+        b7 <<= 1;
+        b7 |= (bits[2].charAt(2)=='0'?1:0);
+        b7 <<= 1;
+        b7 |= (bits[1].charAt(2)=='0'?1:0);
+        b7 <<= 1;
+        b7 |= (bits[0].charAt(2)=='0'?1:0);
+
+        b8 |= (bits[3].charAt(2)=='0'?0:1);
+        b8 <<= 1;
+        b8 |= (bits[2].charAt(2)=='0'?0:1);
+        b8 <<= 1;
+        b8 |= (bits[1].charAt(2)=='0'?0:1);
+        b8 <<= 1;
+        b8 |= (bits[0].charAt(2)=='0'?0:1);
+        b8 <<= 1;
+        b8 |= (bits[3].charAt(1)=='0'?0:1);
+        b8 <<= 1;
+        b8 |= (bits[2].charAt(1)=='0'?0:1);
+        b8 <<= 1;
+        b8 |= (bits[1].charAt(1)=='0'?0:1);
+        b8 <<= 1;
+        b8 |= (bits[0].charAt(1)=='0'?0:1);
+
+        byte[] bytes = {b6, b7, b8};
+        return bytes;
+    }
+
     public static String decodeAccessBits(byte b6, byte b7, byte b8, int block) {
         String bits = "";
 
         switch (block) {
         case 0:
             bits += checkAccessBit(b7, 4) + checkAccessBit(b8, 0) + checkAccessBit(b8, 4);
+            break;
+        case 1:
+            bits += checkAccessBit(b7, 5) + checkAccessBit(b8, 1) + checkAccessBit(b8, 5);
+            break;
+        case 2:
+            bits += checkAccessBit(b7, 6) + checkAccessBit(b8, 2) + checkAccessBit(b8, 6);
             break;
         case 3:
             bits += checkAccessBit(b7, 7) + checkAccessBit(b8, 3) + checkAccessBit(b8, 7);
@@ -121,5 +215,26 @@ class Util {
 
     public static String checkAccessBit(byte ab, int b) {
         return ((ab >> b) & 1)==1 ? "1" : "0";
+    }
+
+    public static byte[] longToBytes(long value) {
+        byte[] buf = new byte[8];
+        for (int i = 7; i >= 0; i--) {
+            buf[i] = (byte)(value & 0xFF);
+            value >>= 8;
+        }
+        return buf;
+    }
+
+    public static long bytesToLong(byte[] bytes) {
+        if (bytes.length != 8) {
+            throw new AssertionError("Buffer size for bytesToLong must be 8.");
+        }
+        long result = 0;
+        for (int i=0; i < 8; i++) {
+            result <<= 8;
+            result |= (bytes[i] & 0xFF);
+        }
+        return result;
     }
 }
