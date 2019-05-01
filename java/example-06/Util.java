@@ -50,6 +50,7 @@ class Util {
 
     public static class Config {
         public int sector;
+        public int ticket_price;
         public String initial_key_a;
         public String initial_key_b;
         public String prod_key_a;
@@ -73,7 +74,8 @@ class Util {
 
         // read project configuration
         Config config = new Config();
-        config.sector = new Integer(props.getProperty("sector"));
+        config.sector = Integer.decode(props.getProperty("sector"));
+        config.ticket_price = Integer.decode(props.getProperty("ticket_price"));
         config.initial_key_a = props.getProperty("initial_key_a");
         config.initial_key_b = props.getProperty("initial_key_b");
         config.prod_key_a = props.getProperty("prod_key_a");

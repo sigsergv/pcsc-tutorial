@@ -8,7 +8,7 @@ help:
 %.class: %.java
 	javac $<
 
-compile: Util.class Test.class IssueCard.class CheckBalance.class TopUpBalance.class
+compile: Util.class Test.class IssueCard.class CheckBalance.class TopUpBalance.class Checkout.class
 
 test: compile
 	java Test
@@ -22,4 +22,6 @@ check-balance: compile
 top-up-balance: compile
 	java TopUpBalance $(ADD)
 
+checkout: compile
+	java Checkout
 
