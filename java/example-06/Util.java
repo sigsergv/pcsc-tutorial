@@ -46,7 +46,7 @@ class Util {
         public CardUpdateFailedException(String message) {
             super(message);
         }
-    };
+    }
 
     public static class Config {
         public int sector;
