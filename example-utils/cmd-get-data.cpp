@@ -85,7 +85,7 @@ int main(int argc, char **argv)
     xpcsc::Bytes command;
     xpcsc::Bytes response;
 
-    xpcsc::Byte cmd[] = {xpcsc::CLA_PICC, xpcsc::INS_PICC_GET_DATA, 0x0, 0x0, 0x0};
+    xpcsc::Byte cmd[] = {0xFF, 0xCA, 0x0, 0x0, 0x0};
 
     command.assign(cmd, sizeof(cmd));
     c.transmit(reader, command, &response);

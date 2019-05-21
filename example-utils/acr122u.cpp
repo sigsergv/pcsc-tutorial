@@ -57,7 +57,7 @@ int main(int argc, char **argv)
     }
 
     // connect to reader
-    xpcsc::Reader reader = 0;
+    xpcsc::Reader reader;
     try {
         std::string reader_name = *readers.begin();
         std::cout << "Found reader: " << reader_name << std::endl;
